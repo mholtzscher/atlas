@@ -35,6 +35,8 @@ func NewCommand() *ufcli.Command {
 		Usage: "Jira Cloud operations",
 		Commands: []*ufcli.Command{
 			newIssueCommand(),
+			newProjectCommand(),
+			newMyselfCommand(),
 		},
 	}
 }
@@ -46,6 +48,32 @@ func newIssueCommand() *ufcli.Command {
 		Commands: []*ufcli.Command{
 			newIssueGetCommand(),
 			newIssueSearchCommand(),
+			newIssueCommentsCommand(),
+			newIssueTypesCommand(),
+		},
+	}
+}
+
+func newIssueCommentsCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:      "comments",
+		Usage:     "Get comments on an issue",
+		ArgsUsage: "<ISSUE_KEY>",
+		Action: func(ctx context.Context, cmd *ufcli.Command) error {
+			deps, err := runtime.New(cmd, ops.OpJiraIssueComments, true)
+			if err != nil {
+				return err
+			}
+
+			if cmd.Args().Len() != 1 {
+				return errors.New("expected exactly one argument: <ISSUE_KEY>")
+			}
+
+			return jiraops.GetIssueComments(ctx, deps.Client, jiraops.GetIssueCommentsRequest{
+				IssueKey: cmd.Args().First(),
+			}, func(comment json.RawMessage) error {
+				return deps.Emitter.EmitRecord(ops.OpJiraIssueComments, comment)
+			})
 		},
 	}
 }
@@ -115,6 +143,80 @@ func newIssueSearchCommand() *ufcli.Command {
 			}, func(issue json.RawMessage) error {
 				return deps.Emitter.EmitRecord(ops.OpJiraIssueSearch, issue)
 			})
+		},
+	}
+}
+
+func newProjectCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:  "project",
+		Usage: "Project operations",
+		Commands: []*ufcli.Command{
+			newProjectListCommand(),
+		},
+	}
+}
+
+func newProjectListCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:  "list",
+		Usage: "List all accessible projects",
+		Action: func(ctx context.Context, cmd *ufcli.Command) error {
+			deps, err := runtime.New(cmd, ops.OpJiraProjectList, true)
+			if err != nil {
+				return err
+			}
+
+			return jiraops.ListProjects(
+				ctx,
+				deps.Client,
+				jiraops.ListProjectsRequest{},
+				func(project json.RawMessage) error {
+					return deps.Emitter.EmitRecord(ops.OpJiraProjectList, project)
+				},
+			)
+		},
+	}
+}
+
+func newMyselfCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:  "myself",
+		Usage: "Get current user information",
+		Action: func(ctx context.Context, cmd *ufcli.Command) error {
+			deps, err := runtime.New(cmd, ops.OpJiraMyself, true)
+			if err != nil {
+				return err
+			}
+
+			user, getErr := jiraops.GetMyself(ctx, deps.Client, jiraops.GetMyselfRequest{})
+			if getErr != nil {
+				return getErr
+			}
+
+			return deps.Emitter.EmitRecord(ops.OpJiraMyself, user)
+		},
+	}
+}
+
+func newIssueTypesCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:  "types",
+		Usage: "List all issue types",
+		Action: func(ctx context.Context, cmd *ufcli.Command) error {
+			deps, err := runtime.New(cmd, ops.OpJiraIssueTypes, true)
+			if err != nil {
+				return err
+			}
+
+			return jiraops.ListIssueTypes(
+				ctx,
+				deps.Client,
+				jiraops.ListIssueTypesRequest{},
+				func(issueType json.RawMessage) error {
+					return deps.Emitter.EmitRecord(ops.OpJiraIssueTypes, issueType)
+				},
+			)
 		},
 	}
 }

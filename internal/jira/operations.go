@@ -214,3 +214,149 @@ func decodeSearchResponse(body []byte) (issueSearchResponse, error) {
 
 	return response, nil
 }
+
+const (
+	projectSearchPath = "/rest/api/3/project/search"
+	issueCommentsPath = "/rest/api/3/issue/"
+	issueTypesPath    = "/rest/api/3/issuetype"
+	myselfPath        = "/rest/api/3/myself"
+)
+
+// ListProjectsRequest defines Jira project list inputs.
+type ListProjectsRequest struct{}
+
+// ListProjects fetches all projects accessible to the user.
+func ListProjects(
+	ctx context.Context,
+	client *atlassian.Client,
+	_ ListProjectsRequest,
+	emit func(item json.RawMessage) error,
+) error {
+	query := url.Values{}
+	query.Set("maxResults", "1000")
+
+	body, err := client.Get(ctx, projectSearchPath, query, ops.OpJiraProjectList)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Values []json.RawMessage `json:"values"`
+	}
+	if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
+		return atlaserr.New(
+			atlaserr.CodeUpstreamError,
+			"invalid Jira project list response JSON",
+			ops.OpJiraProjectList,
+			false,
+			nil,
+		)
+	}
+
+	for _, project := range response.Values {
+		if emitErr := emit(project); emitErr != nil {
+			return fmt.Errorf("emit project: %w", emitErr)
+		}
+	}
+
+	return nil
+}
+
+// GetIssueCommentsRequest defines Jira issue comments inputs.
+type GetIssueCommentsRequest struct {
+	IssueKey string
+}
+
+// GetIssueComments fetches comments for an issue.
+func GetIssueComments(
+	ctx context.Context,
+	client *atlassian.Client,
+	request GetIssueCommentsRequest,
+	emit func(item json.RawMessage) error,
+) error {
+	if request.IssueKey == "" {
+		return atlaserr.InvalidArgument("missing issue key", ops.OpJiraIssueComments)
+	}
+
+	path := issueCommentsPath + url.PathEscape(request.IssueKey) + "/comment"
+	query := url.Values{}
+	query.Set("maxResults", "1000")
+
+	body, err := client.Get(ctx, path, query, ops.OpJiraIssueComments)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Comments []json.RawMessage `json:"comments"`
+	}
+	if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
+		return atlaserr.New(
+			atlaserr.CodeUpstreamError,
+			"invalid Jira issue comments response JSON",
+			ops.OpJiraIssueComments,
+			false,
+			nil,
+		)
+	}
+
+	for _, comment := range response.Comments {
+		if emitErr := emit(comment); emitErr != nil {
+			return fmt.Errorf("emit comment: %w", emitErr)
+		}
+	}
+
+	return nil
+}
+
+// ListIssueTypesRequest defines Jira issue types list inputs.
+type ListIssueTypesRequest struct{}
+
+// ListIssueTypes fetches all issue types.
+func ListIssueTypes(
+	ctx context.Context,
+	client *atlassian.Client,
+	_ ListIssueTypesRequest,
+	emit func(item json.RawMessage) error,
+) error {
+	body, err := client.Get(ctx, issueTypesPath, nil, ops.OpJiraIssueTypes)
+	if err != nil {
+		return err
+	}
+
+	var issueTypes []json.RawMessage
+	if unmarshalErr := json.Unmarshal(body, &issueTypes); unmarshalErr != nil {
+		return atlaserr.New(
+			atlaserr.CodeUpstreamError,
+			"invalid Jira issue types response JSON",
+			ops.OpJiraIssueTypes,
+			false,
+			nil,
+		)
+	}
+
+	for _, issueType := range issueTypes {
+		if emitErr := emit(issueType); emitErr != nil {
+			return fmt.Errorf("emit issue type: %w", emitErr)
+		}
+	}
+
+	return nil
+}
+
+// GetMyselfRequest defines Jira myself inputs.
+type GetMyselfRequest struct{}
+
+// GetMyself fetches the current user's information.
+func GetMyself(
+	ctx context.Context,
+	client *atlassian.Client,
+	_ GetMyselfRequest,
+) (json.RawMessage, error) {
+	body, err := client.Get(ctx, myselfPath, nil, ops.OpJiraMyself)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(body), nil
+}

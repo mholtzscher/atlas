@@ -5,6 +5,10 @@ package ops
 const (
 	OpJiraIssueGet         = "jira.issue.get"
 	OpJiraIssueSearch      = "jira.issue.search"
+	OpJiraProjectList      = "jira.project.list"
+	OpJiraIssueComments    = "jira.issue.comments"
+	OpJiraIssueTypes       = "jira.issue.types"
+	OpJiraMyself           = "jira.myself"
 	OpConfluencePageGet    = "confluence.page.get"
 	OpConfluencePageSearch = "confluence.page.search"
 )
@@ -51,6 +55,32 @@ func All() []Definition {
 					"page-token",
 				},
 			},
+		},
+		{
+			Op:      OpJiraProjectList,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args:    Args{},
+		},
+		{
+			Op:      OpJiraIssueComments,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args: Args{
+				Positional: []string{"issueKey"},
+			},
+		},
+		{
+			Op:      OpJiraIssueTypes,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args:    Args{},
+		},
+		{
+			Op:      OpJiraMyself,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args:    Args{},
 		},
 		{
 			Op:      OpConfluencePageGet,
