@@ -2,8 +2,10 @@ package confluence
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 
+	"github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/go-xmlfmt/xmlfmt"
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
@@ -64,6 +66,16 @@ func CleanHTML(html string) string {
 	cleaned = acLocalIDRegex.ReplaceAllString(cleaned, "")
 	cleaned = acNameRegex.ReplaceAllString(cleaned, "")
 	return cleaned
+}
+
+// ConvertToMarkdown converts HTML content to Markdown format.
+// Uses the html-to-markdown library for robust conversion.
+func ConvertToMarkdown(html string) (string, error) {
+	markdown, err := htmltomarkdown.ConvertString(html)
+	if err != nil {
+		return "", fmt.Errorf("convert HTML to markdown: %w", err)
+	}
+	return markdown, nil
 }
 
 func extractFromStorage(bodyFields map[string]json.RawMessage) (string, bool) {

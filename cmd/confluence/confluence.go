@@ -172,8 +172,15 @@ func newPageDescribeCommand() *ufcli.Command {
 func newPageViewCommand() *ufcli.Command {
 	return &ufcli.Command{
 		Name:      "view",
-		Usage:     "Show page body content (formatted HTML)",
+		Usage:     "Show page body content",
 		ArgsUsage: "<PAGE_ID>",
+		Flags: []ufcli.Flag{
+			&ufcli.StringFlag{
+				Name:  "format",
+				Value: "html",
+				Usage: "Output format (html, markdown)",
+			},
+		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, true)
 			if err != nil {
@@ -199,8 +206,22 @@ func newPageViewCommand() *ufcli.Command {
 				return extractErr
 			}
 
-			formatted := confluenceops.PrettyPrintHTML(html)
-			if _, writeErr := fmt.Fprint(cmd.Writer, formatted); writeErr != nil {
+			format := cmd.String("format")
+			var output string
+			switch format {
+			case "markdown":
+				markdown, convertErr := confluenceops.ConvertToMarkdown(html)
+				if convertErr != nil {
+					return convertErr
+				}
+				output = markdown
+			case "html":
+				output = confluenceops.PrettyPrintHTML(html)
+			default:
+				return fmt.Errorf("invalid format %q: must be 'html' or 'markdown'", format)
+			}
+
+			if _, writeErr := fmt.Fprint(cmd.Writer, output); writeErr != nil {
 				return fmt.Errorf("write page content: %w", writeErr)
 			}
 

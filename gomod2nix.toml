@@ -61,6 +61,14 @@ schema = 3
     version = 'v0.1.1'
     hash = 'sha256-cuLymf5+7efafkePd7uz4pMxKGVl/JsEhEx8C8/RGL0='
 
+  [mod.'github.com/JohannesKaufmann/dom']
+    version = 'v0.2.0'
+    hash = 'sha256-vrJG0spzGYAflEvAz0sYvD6nC6IYI5lAZbIx82GBtQE='
+
+  [mod.'github.com/JohannesKaufmann/html-to-markdown/v2']
+    version = 'v2.5.0'
+    hash = 'sha256-xTfJNijtDlQ5oEZkl92KEyFg3U+Wl4nJcsT5puS7h4A='
+
   [mod.'github.com/Masterminds/semver/v3']
     version = 'v3.4.0'
     hash = 'sha256-75kRraVwYVjYLWZvuSlts4Iu28Eh3SpiF0GHc7vCYHI='
@@ -633,10 +641,6 @@ schema = 3
     version = 'v2.22.11'
     hash = 'sha256-HAYLlAPRGDwFgOILcMLM+DlHvbWkvohfsz7sZ0ms4HI='
 
-  [mod.'github.com/sergi/go-diff']
-    version = 'v1.4.0'
-    hash = 'sha256-rs9NKpv/qcQEMRg7CmxGdP4HGuFdBxlpWf9LbA9wS4k='
-
   [mod.'github.com/sirupsen/logrus']
     version = 'v1.9.3'
     hash = 'sha256-EnxsWdEUPYid+aZ9H4/iMTs1XMvCLbXZRDyvj89Ebms='
@@ -804,6 +808,10 @@ schema = 3
   [mod.'golang.org/x/mod']
     version = 'v0.31.0'
     hash = 'sha256-ZVNmaZADgM3+30q9rW8q4gP6ySkT7r1eb4vrHIlpCjM='
+
+  [mod.'golang.org/x/net']
+    version = 'v0.48.0'
+    hash = 'sha256-oZpddsiJwWCH3Aipa+XXpy7G/xHY5fEagUSok7T0bXE='
 
   [mod.'golang.org/x/sync']
     version = 'v0.19.0'

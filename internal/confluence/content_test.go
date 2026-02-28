@@ -66,6 +66,96 @@ func TestExtractPageViewHTML(t *testing.T) {
 	}
 }
 
+func TestConvertToMarkdown(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		html        string
+		expectedMD  string
+		expectError bool
+	}{
+		{
+			name:       "converts heading",
+			html:       "<h1>Hello World</h1>",
+			expectedMD: "# Hello World",
+		},
+		{
+			name:       "converts paragraph",
+			html:       "<p>This is a paragraph.</p>",
+			expectedMD: "This is a paragraph.",
+		},
+		{
+			name:       "converts strong text",
+			html:       "<p>This is <strong>bold</strong> text.</p>",
+			expectedMD: "This is **bold** text.",
+		},
+		{
+			name:       "converts emphasis",
+			html:       "<p>This is <em>italic</em> text.</p>",
+			expectedMD: "This is *italic* text.",
+		},
+		{
+			name:       "converts link",
+			html:       `<a href="https://example.com">Link text</a>`,
+			expectedMD: "[Link text](https://example.com)",
+		},
+		{
+			name:       "converts unordered list",
+			html:       "<ul><li>Item 1</li><li>Item 2</li></ul>",
+			expectedMD: "- Item 1\n- Item 2",
+		},
+		{
+			name:       "converts ordered list",
+			html:       "<ol><li>First</li><li>Second</li></ol>",
+			expectedMD: "1. First\n2. Second",
+		},
+		{
+			name:       "converts code block",
+			html:       "<pre><code>func main() {}</code></pre>",
+			expectedMD: "```\nfunc main() {}\n```",
+		},
+		{
+			name:       "converts inline code",
+			html:       "<p>Use <code>print()</code> function.</p>",
+			expectedMD: "Use `print()` function.",
+		},
+		{
+			name:       "handles empty string",
+			html:       "",
+			expectedMD: "",
+		},
+		{
+			name:       "handles plain text",
+			html:       "Just plain text.",
+			expectedMD: "Just plain text.",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			markdown, err := confluenceops.ConvertToMarkdown(testCase.html)
+
+			if testCase.expectError {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ConvertToMarkdown returned error: %v", err)
+			}
+
+			if markdown != testCase.expectedMD {
+				t.Fatalf("expected markdown %q, got %q", testCase.expectedMD, markdown)
+			}
+		})
+	}
+}
+
 func assertPageViewError(t *testing.T, err error, expectedMessage string) {
 	t.Helper()
 
