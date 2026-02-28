@@ -38,21 +38,21 @@ type issueSearchResponse struct {
 
 // GetIssueRequest defines Jira issue get inputs.
 type GetIssueRequest struct {
-	IssueKey     string
-	Fields       []string
-	Expand       []string
-	FieldsByKeys bool
+	IssueKey string
+	Fields   []string
+	Expand   []string
+	Raw      bool
 }
 
 // SearchIssuesRequest defines Jira issue search inputs.
 type SearchIssuesRequest struct {
-	JQL          string
-	Fields       []string
-	Expand       []string
-	FieldsByKeys bool
-	Limit        int
-	PageSize     int
-	PageToken    string
+	JQL       string
+	Fields    []string
+	Expand    []string
+	Raw       bool
+	Limit     int
+	PageSize  int
+	PageToken string
 }
 
 // DefaultFields returns token-efficient default field selection.
@@ -77,11 +77,11 @@ func GetIssue(
 	request GetIssueRequest,
 ) (json.RawMessage, error) {
 	if request.IssueKey == "" {
-		return nil, atlaserr.InvalidArgument("missing issue key", ops.OpJiraIssueGet)
+		return nil, atlaserr.InvalidArgument("missing issue key", ops.OpJiraIssueDescribe)
 	}
 
-	query := buildIssueQuery(request.Fields, request.Expand, request.FieldsByKeys)
-	body, err := client.Get(ctx, issueGetPathPrefix+url.PathEscape(request.IssueKey), query, ops.OpJiraIssueGet)
+	query := buildIssueQuery(request.Fields, request.Expand, request.Raw)
+	body, err := client.Get(ctx, issueGetPathPrefix+url.PathEscape(request.IssueKey), query, ops.OpJiraIssueDescribe)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func SearchIssues(
 
 	for remaining > 0 {
 		pageSize := min(remaining, request.PageSize)
-		query := buildIssueQuery(request.Fields, request.Expand, request.FieldsByKeys)
+		query := buildIssueQuery(request.Fields, request.Expand, request.Raw)
 		query.Set("jql", request.JQL)
 		query.Set("maxResults", strconv.Itoa(pageSize))
 		if nextPageToken != "" {
@@ -181,15 +181,12 @@ func emitIssues(
 	return remaining, nil
 }
 
-func buildIssueQuery(fields []string, expand []string, fieldsByKeys bool) url.Values {
+func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
 	query := url.Values{}
 
-	query.Set("fieldsByKeys", strconv.FormatBool(fieldsByKeys))
+	query.Set("fieldsByKeys", "true")
 
-	effectiveFields := fields
-	if len(effectiveFields) == 0 {
-		effectiveFields = DefaultFields()
-	}
+	effectiveFields := mergeIssueFields(fields, raw)
 
 	query.Set("fields", strings.Join(effectiveFields, ","))
 
@@ -198,6 +195,40 @@ func buildIssueQuery(fields []string, expand []string, fieldsByKeys bool) url.Va
 	}
 
 	return query
+}
+
+func mergeIssueFields(fields []string, raw bool) []string {
+	if raw {
+		return []string{"*all"}
+	}
+
+	defaults := DefaultFields()
+	effectiveFields := make([]string, 0, len(defaults)+len(fields))
+	seen := make(map[string]struct{}, len(defaults)+len(fields))
+
+	appendField := func(rawField string) {
+		field := strings.TrimSpace(rawField)
+		if field == "" {
+			return
+		}
+
+		if _, exists := seen[field]; exists {
+			return
+		}
+
+		seen[field] = struct{}{}
+		effectiveFields = append(effectiveFields, field)
+	}
+
+	for _, field := range defaults {
+		appendField(field)
+	}
+
+	for _, field := range fields {
+		appendField(field)
+	}
+
+	return effectiveFields
 }
 
 func decodeSearchResponse(body []byte) (issueSearchResponse, error) {

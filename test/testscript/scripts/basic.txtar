@@ -9,6 +9,12 @@ exec atlas --version
 stdout '0.1.0'
 ! stderr .
 
+# Test confluence page command surface rename
+exec atlas confluence page --help
+stdout 'describe'
+stdout 'view'
+! stdout 'get'
+
 # Test missing auth/site emits text error (pre-command errors use text format)
 ! exec atlas jira issue search --jql 'project=ABC'
 ! stdout .

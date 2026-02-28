@@ -53,13 +53,15 @@ type SearchOptions struct {
 	IncludeProperties bool
 	IncludeOperations bool
 	IncludeVersions   bool
+	Raw               bool
 }
 
-// GetPageRequest defines page get inputs.
+// GetPageRequest defines page describe/view inputs.
 type GetPageRequest struct {
 	SearchOptions
 
-	PageID string
+	PageID    string
+	Operation string
 }
 
 // SearchPagesRequest defines page search inputs.
@@ -91,6 +93,7 @@ type ListPageCommentsRequest struct {
 	PageSize   int
 	Cursor     string
 	BodyFormat string
+	Raw        bool
 }
 
 // GetPage fetches one page by ID.
@@ -99,25 +102,35 @@ func GetPage(
 	client *atlassian.Client,
 	request GetPageRequest,
 ) (json.RawMessage, error) {
+	operation := resolveGetPageOperation(request)
+
 	if request.PageID == "" {
-		return nil, atlaserr.InvalidArgument("missing page ID", ops.OpConfluencePageGet)
+		return nil, atlaserr.InvalidArgument("missing page ID", operation)
 	}
 
 	body, err := client.Get(
 		ctx,
 		pageGetPathPrefix+url.PathEscape(request.PageID),
 		buildQuery(request.SearchOptions),
-		ops.OpConfluencePageGet,
+		operation,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if request.BodyFormat == BodyFormatNone {
-		return removeBody(json.RawMessage(body), ops.OpConfluencePageGet)
+	if request.BodyFormat == BodyFormatNone && !request.Raw {
+		return removeBody(json.RawMessage(body), operation)
 	}
 
 	return json.RawMessage(body), nil
+}
+
+func resolveGetPageOperation(request GetPageRequest) string {
+	if request.Operation != "" {
+		return request.Operation
+	}
+
+	return ops.OpConfluencePageDescribe
 }
 
 // SearchPages streams pages from CQL search.
@@ -137,7 +150,7 @@ func SearchPages(
 
 	remaining := request.Limit
 	nextURL := buildInitialSearchURL(request)
-	stripBody := request.BodyFormat == BodyFormatNone
+	stripBody := request.BodyFormat == BodyFormatNone && !request.Raw
 
 	for remaining > 0 && nextURL != "" {
 		response, pageErr := getSearchPage(ctx, client, nextURL)
@@ -219,21 +232,21 @@ func GetSpaceByKey(
 	request GetSpaceByKeyRequest,
 ) (json.RawMessage, error) {
 	if request.SpaceKey == "" {
-		return nil, atlaserr.InvalidArgument("missing space key", ops.OpConfluenceSpaceGet)
+		return nil, atlaserr.InvalidArgument("missing space key", ops.OpConfluenceSpaceDescribe)
 	}
 
 	lookupQuery := url.Values{}
 	lookupQuery.Set("keys", request.SpaceKey)
 	lookupQuery.Set("limit", "1")
 
-	lookupBody, lookupErr := client.Get(ctx, spacesPath, lookupQuery, ops.OpConfluenceSpaceGet)
+	lookupBody, lookupErr := client.Get(ctx, spacesPath, lookupQuery, ops.OpConfluenceSpaceDescribe)
 	if lookupErr != nil {
 		return nil, lookupErr
 	}
 
 	lookupResponse, decodeErr := decodeResultsPage(
 		lookupBody,
-		ops.OpConfluenceSpaceGet,
+		ops.OpConfluenceSpaceDescribe,
 		"invalid Confluence space lookup response JSON",
 	)
 	if decodeErr != nil {
@@ -253,7 +266,7 @@ func GetSpaceByKey(
 		return nil, atlaserr.New(
 			atlaserr.CodeNotFound,
 			"space not found",
-			ops.OpConfluenceSpaceGet,
+			ops.OpConfluenceSpaceDescribe,
 			false,
 			details,
 		)
@@ -264,7 +277,7 @@ func GetSpaceByKey(
 		return nil, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"space lookup result missing valid id",
-			ops.OpConfluenceSpaceGet,
+			ops.OpConfluenceSpaceDescribe,
 			false,
 			nil,
 		)
@@ -274,7 +287,7 @@ func GetSpaceByKey(
 		ctx,
 		spacesGetPathPrefix+url.PathEscape(spaceID),
 		nil,
-		ops.OpConfluenceSpaceGet,
+		ops.OpConfluenceSpaceDescribe,
 	)
 	if getErr != nil {
 		return nil, getErr
@@ -430,7 +443,7 @@ func buildInitialSpacesURL(request ListSpacesRequest) string {
 }
 
 func buildInitialPageCommentsURL(request ListPageCommentsRequest) string {
-	query := buildCommentsQuery(request.BodyFormat, min(request.Limit, request.PageSize), request.Cursor)
+	query := buildCommentsQuery(request.BodyFormat, request.Raw, min(request.Limit, request.PageSize), request.Cursor)
 	resolvedURL := url.URL{
 		Path:     fmt.Sprintf(pageFooterCommentsPathTemplate, url.PathEscape(request.PageID)),
 		RawQuery: query.Encode(),
@@ -439,8 +452,8 @@ func buildInitialPageCommentsURL(request ListPageCommentsRequest) string {
 	return resolvedURL.String()
 }
 
-func buildCommentChildrenURL(commentID string, pageSize int, bodyFormat string) string {
-	query := buildCommentsQuery(bodyFormat, pageSize, "")
+func buildCommentChildrenURL(commentID string, pageSize int, bodyFormat string, raw bool) string {
+	query := buildCommentsQuery(bodyFormat, raw, pageSize, "")
 	resolvedURL := url.URL{
 		Path:     fmt.Sprintf(commentChildrenPathTemplate, url.PathEscape(commentID)),
 		RawQuery: query.Encode(),
@@ -449,11 +462,15 @@ func buildCommentChildrenURL(commentID string, pageSize int, bodyFormat string) 
 	return resolvedURL.String()
 }
 
-func buildCommentsQuery(bodyFormat string, limit int, cursor string) url.Values {
+func buildCommentsQuery(bodyFormat string, raw bool, limit int, cursor string) url.Values {
 	query := url.Values{}
+	effectiveBodyFormat := bodyFormat
+	if raw && (effectiveBodyFormat == "" || effectiveBodyFormat == BodyFormatNone) {
+		effectiveBodyFormat = BodyFormatView
+	}
 
-	if bodyFormat != "" && bodyFormat != BodyFormatNone {
-		query.Set("body-format", bodyFormat)
+	if effectiveBodyFormat != "" && effectiveBodyFormat != BodyFormatNone {
+		query.Set("body-format", effectiveBodyFormat)
 	}
 
 	query.Set("limit", strconv.Itoa(limit))
@@ -581,7 +598,7 @@ func emitChildrenForParent(
 	visitedCommentIDs map[string]struct{},
 	emit func(item json.RawMessage) error,
 ) ([]string, int, error) {
-	nextURL := buildCommentChildrenURL(parentID, request.PageSize, request.BodyFormat)
+	nextURL := buildCommentChildrenURL(parentID, request.PageSize, request.BodyFormat, request.Raw)
 	childIDs := make([]string, 0, request.PageSize)
 
 	for remaining > 0 && nextURL != "" {
@@ -667,24 +684,28 @@ func appendReversed(base []string, items []string) []string {
 
 func buildQuery(options SearchOptions) url.Values {
 	query := url.Values{}
-
-	if options.BodyFormat != "" && options.BodyFormat != BodyFormatNone {
-		query.Set("body-format", options.BodyFormat)
+	effectiveBodyFormat := options.BodyFormat
+	if options.Raw && (effectiveBodyFormat == "" || effectiveBodyFormat == BodyFormatNone) {
+		effectiveBodyFormat = BodyFormatView
 	}
 
-	if options.IncludeLabels {
+	if effectiveBodyFormat != "" && effectiveBodyFormat != BodyFormatNone {
+		query.Set("body-format", effectiveBodyFormat)
+	}
+
+	if options.IncludeLabels || options.Raw {
 		query.Set("include-labels", strconv.FormatBool(true))
 	}
 
-	if options.IncludeProperties {
+	if options.IncludeProperties || options.Raw {
 		query.Set("include-properties", strconv.FormatBool(true))
 	}
 
-	if options.IncludeOperations {
+	if options.IncludeOperations || options.Raw {
 		query.Set("include-operations", strconv.FormatBool(true))
 	}
 
-	if options.IncludeVersions {
+	if options.IncludeVersions || options.Raw {
 		query.Set("include-versions", strconv.FormatBool(true))
 	}
 

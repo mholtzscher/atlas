@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	ufcli "github.com/urfave/cli/v3"
 
@@ -23,6 +24,7 @@ const (
 	flagLimit             = "limit"
 	flagPageSize          = "page-size"
 	flagCursor            = "cursor"
+	flagRaw               = "raw"
 )
 
 const (
@@ -48,7 +50,7 @@ func newSpaceCommand() *ufcli.Command {
 		Usage: "Space operations",
 		Commands: []*ufcli.Command{
 			newSpaceListCommand(),
-			newSpaceGetCommand(),
+			newSpaceDescribeCommand(),
 		},
 	}
 }
@@ -58,7 +60,8 @@ func newPageCommand() *ufcli.Command {
 		Name:  "page",
 		Usage: "Page operations",
 		Commands: []*ufcli.Command{
-			newPageGetCommand(),
+			newPageDescribeCommand(),
+			newPageViewCommand(),
 			newPageSearchCommand(),
 			newPageCommentsCommand(),
 		},
@@ -66,10 +69,13 @@ func newPageCommand() *ufcli.Command {
 }
 
 func newSpaceListCommand() *ufcli.Command {
+	flags := paginationFlags("Max spaces to emit")
+	flags = append(flags, &ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"})
+
 	return &ufcli.Command{
 		Name:  "list",
 		Usage: "List accessible spaces",
-		Flags: paginationFlags("Max spaces to emit"),
+		Flags: flags,
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, ops.OpConfluenceSpaceList, true)
 			if err != nil {
@@ -81,19 +87,26 @@ func newSpaceListCommand() *ufcli.Command {
 				PageSize: cmd.Int(flagPageSize),
 				Cursor:   cmd.String(flagCursor),
 			}, func(space json.RawMessage) error {
+				compactSpace, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), space)
+				if compactErr != nil {
+					return compactErr
+				}
+
+				space = compactSpace
 				return deps.Emitter.EmitRecord(ops.OpConfluenceSpaceList, space)
 			})
 		},
 	}
 }
 
-func newSpaceGetCommand() *ufcli.Command {
+func newSpaceDescribeCommand() *ufcli.Command {
 	return &ufcli.Command{
-		Name:      "get",
-		Usage:     "Get space by key",
+		Name:      "describe",
+		Usage:     "Describe space by key",
 		ArgsUsage: "<SPACE_KEY>",
+		Flags:     []ufcli.Flag{&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"}},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluenceSpaceGet, true)
+			deps, err := runtime.New(cmd, ops.OpConfluenceSpaceDescribe, true)
 			if err != nil {
 				return err
 			}
@@ -102,26 +115,33 @@ func newSpaceGetCommand() *ufcli.Command {
 				return errors.New("expected exactly one argument: <SPACE_KEY>")
 			}
 
-			space, getErr := confluenceops.GetSpaceByKey(ctx, deps.Client, confluenceops.GetSpaceByKeyRequest{
+			space, describeErr := confluenceops.GetSpaceByKey(ctx, deps.Client, confluenceops.GetSpaceByKeyRequest{
 				SpaceKey: cmd.Args().First(),
 			})
-			if getErr != nil {
-				return getErr
+			if describeErr != nil {
+				return describeErr
 			}
 
-			return deps.Emitter.EmitRecord(ops.OpConfluenceSpaceGet, space)
+			compactSpace, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), space)
+			if compactErr != nil {
+				return compactErr
+			}
+
+			space = compactSpace
+
+			return deps.Emitter.EmitRecord(ops.OpConfluenceSpaceDescribe, space)
 		},
 	}
 }
 
-func newPageGetCommand() *ufcli.Command {
+func newPageDescribeCommand() *ufcli.Command {
 	return &ufcli.Command{
-		Name:      "get",
-		Usage:     "Get page by ID",
+		Name:      "describe",
+		Usage:     "Describe page metadata by ID",
 		ArgsUsage: "<PAGE_ID>",
-		Flags:     pageFlags(),
+		Flags:     pageDescribeFlags(),
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluencePageGet, true)
+			deps, err := runtime.New(cmd, ops.OpConfluencePageDescribe, true)
 			if err != nil {
 				return err
 			}
@@ -132,19 +152,67 @@ func newPageGetCommand() *ufcli.Command {
 
 			page, getErr := confluenceops.GetPage(ctx, deps.Client, confluenceops.GetPageRequest{
 				PageID:        cmd.Args().First(),
-				SearchOptions: buildSearchOptions(cmd),
+				SearchOptions: buildPageDescribeOptions(cmd),
 			})
 			if getErr != nil {
 				return getErr
 			}
 
-			return deps.Emitter.EmitRecord(ops.OpConfluencePageGet, page)
+			compactPage, compactErr := maybeCompactConfluenceRecord(false, page)
+			if compactErr != nil {
+				return compactErr
+			}
+
+			page = compactPage
+
+			return deps.Emitter.EmitRecord(ops.OpConfluencePageDescribe, page)
+		},
+	}
+}
+
+func newPageViewCommand() *ufcli.Command {
+	return &ufcli.Command{
+		Name:      "view",
+		Usage:     "Show page body content (formatted HTML)",
+		ArgsUsage: "<PAGE_ID>",
+		Action: func(ctx context.Context, cmd *ufcli.Command) error {
+			deps, err := runtime.New(cmd, ops.OpConfluencePageView, true)
+			if err != nil {
+				return err
+			}
+
+			if cmd.Args().Len() != 1 {
+				return errors.New("expected exactly one argument: <PAGE_ID>")
+			}
+
+			page, getErr := confluenceops.GetPage(ctx, deps.Client, confluenceops.GetPageRequest{
+				PageID: cmd.Args().First(),
+				SearchOptions: confluenceops.SearchOptions{
+					BodyFormat: confluenceops.BodyFormatStorage,
+				},
+				Operation: ops.OpConfluencePageView,
+			})
+			if getErr != nil {
+				return getErr
+			}
+
+			html, extractErr := confluenceops.ExtractPageViewHTML(page)
+			if extractErr != nil {
+				return extractErr
+			}
+
+			formatted := confluenceops.PrettyPrintHTML(html)
+			if _, writeErr := fmt.Fprint(cmd.Writer, formatted); writeErr != nil {
+				return fmt.Errorf("write page content: %w", writeErr)
+			}
+
+			return nil
 		},
 	}
 }
 
 func newPageSearchCommand() *ufcli.Command {
-	flags := pageFlags()
+	flags := pageSearchFlags()
 	flags = append(flags, &ufcli.StringFlag{Name: flagCQL, Usage: "CQL query", Required: true})
 	flags = append(flags, paginationFlags("Max pages to emit")...)
 
@@ -165,6 +233,12 @@ func newPageSearchCommand() *ufcli.Command {
 				Cursor:        cmd.String(flagCursor),
 				SearchOptions: buildSearchOptions(cmd),
 			}, func(page json.RawMessage) error {
+				compactPage, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), page)
+				if compactErr != nil {
+					return compactErr
+				}
+
+				page = compactPage
 				return deps.Emitter.EmitRecord(ops.OpConfluencePageSearch, page)
 			})
 		},
@@ -196,20 +270,22 @@ func newPageCommentsCommand() *ufcli.Command {
 				PageSize:   cmd.Int(flagPageSize),
 				Cursor:     cmd.String(flagCursor),
 				BodyFormat: cmd.String(flagBodyFormat),
+				Raw:        cmd.Bool(flagRaw),
 			}, func(comment json.RawMessage) error {
+				compactComment, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), comment)
+				if compactErr != nil {
+					return compactErr
+				}
+
+				comment = compactComment
 				return deps.Emitter.EmitRecord(ops.OpConfluencePageComments, comment)
 			})
 		},
 	}
 }
 
-func pageFlags() []ufcli.Flag {
+func pageDescribeFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.StringFlag{
-			Name:  flagBodyFormat,
-			Value: confluenceops.BodyFormatView,
-			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
-		},
 		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
 		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
 		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
@@ -217,13 +293,29 @@ func pageFlags() []ufcli.Flag {
 	}
 }
 
+func pageSearchFlags() []ufcli.Flag {
+	return []ufcli.Flag{
+		&ufcli.StringFlag{
+			Name:  flagBodyFormat,
+			Value: confluenceops.BodyFormatNone,
+			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
+		},
+		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
+		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
+		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
+		&ufcli.BoolFlag{Name: flagIncludeVersions, Usage: "Include versions"},
+		&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"},
+	}
+}
+
 func commentsFlags() []ufcli.Flag {
 	return []ufcli.Flag{
 		&ufcli.StringFlag{
 			Name:  flagBodyFormat,
-			Value: confluenceops.BodyFormatView,
+			Value: confluenceops.BodyFormatNone,
 			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
 		},
+		&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"},
 	}
 }
 
@@ -242,5 +334,29 @@ func buildSearchOptions(cmd *ufcli.Command) confluenceops.SearchOptions {
 		IncludeProperties: cmd.Bool(flagIncludeProperties),
 		IncludeOperations: cmd.Bool(flagIncludeOperations),
 		IncludeVersions:   cmd.Bool(flagIncludeVersions),
+		Raw:               cmd.Bool(flagRaw),
 	}
+}
+
+func buildPageDescribeOptions(cmd *ufcli.Command) confluenceops.SearchOptions {
+	return confluenceops.SearchOptions{
+		BodyFormat:        confluenceops.BodyFormatNone,
+		IncludeLabels:     cmd.Bool(flagIncludeLabels),
+		IncludeProperties: cmd.Bool(flagIncludeProperties),
+		IncludeOperations: cmd.Bool(flagIncludeOperations),
+		IncludeVersions:   cmd.Bool(flagIncludeVersions),
+	}
+}
+
+func maybeCompactConfluenceRecord(raw bool, record json.RawMessage) (json.RawMessage, error) {
+	if raw {
+		return record, nil
+	}
+
+	compactRecord, compactErr := confluenceops.CompactRecord(record)
+	if compactErr != nil {
+		return nil, fmt.Errorf("compact confluence output: %w", compactErr)
+	}
+
+	return compactRecord, nil
 }

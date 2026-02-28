@@ -3,17 +3,18 @@ package ops
 
 // Stable operation IDs.
 const (
-	OpJiraIssueGet           = "jira.issue.get"
-	OpJiraIssueSearch        = "jira.issue.search"
-	OpJiraProjectList        = "jira.project.list"
-	OpJiraIssueComments      = "jira.issue.comments"
-	OpJiraIssueTypes         = "jira.issue.types"
-	OpJiraMyself             = "jira.myself"
-	OpConfluenceSpaceList    = "confluence.space.list"
-	OpConfluenceSpaceGet     = "confluence.space.get"
-	OpConfluencePageComments = "confluence.page.comments"
-	OpConfluencePageGet      = "confluence.page.get"
-	OpConfluencePageSearch   = "confluence.page.search"
+	OpJiraIssueDescribe       = "jira.issue.describe"
+	OpJiraIssueSearch         = "jira.issue.search"
+	OpJiraProjectList         = "jira.project.list"
+	OpJiraIssueComments       = "jira.issue.comments"
+	OpJiraIssueTypes          = "jira.issue.types"
+	OpJiraMyself              = "jira.myself"
+	OpConfluenceSpaceList     = "confluence.space.list"
+	OpConfluenceSpaceDescribe = "confluence.space.describe"
+	OpConfluencePageComments  = "confluence.page.comments"
+	OpConfluencePageDescribe  = "confluence.page.describe"
+	OpConfluencePageView      = "confluence.page.view"
+	OpConfluencePageSearch    = "confluence.page.search"
 )
 
 // Definition describes one operation for allowlisting.
@@ -41,12 +42,12 @@ func All() []Definition {
 func jiraDefinitions() []Definition {
 	return []Definition{
 		{
-			Op:      OpJiraIssueGet,
+			Op:      OpJiraIssueDescribe,
 			Mutates: false,
 			Auth:    []string{"pat", "oauth"},
 			Args: Args{
 				Positional: []string{"issueKey"},
-				Flags:      []string{"fields", "expand", "fields-by-keys"},
+				Flags:      []string{"fields", "expand", "raw"},
 			},
 		},
 		{
@@ -59,7 +60,7 @@ func jiraDefinitions() []Definition {
 					"jql",
 					"fields",
 					"expand",
-					"fields-by-keys",
+					"raw",
 					"limit",
 					"page-size",
 					"page-token",
@@ -107,15 +108,17 @@ func confluenceDefinitions() []Definition {
 					"limit",
 					"page-size",
 					"cursor",
+					"raw",
 				},
 			},
 		},
 		{
-			Op:      OpConfluenceSpaceGet,
+			Op:      OpConfluenceSpaceDescribe,
 			Mutates: false,
 			Auth:    []string{"pat", "oauth"},
 			Args: Args{
 				Positional: []string{"spaceKey"},
+				Flags:      []string{"raw"},
 			},
 		},
 		{
@@ -129,22 +132,30 @@ func confluenceDefinitions() []Definition {
 					"page-size",
 					"cursor",
 					"body-format",
+					"raw",
 				},
 			},
 		},
 		{
-			Op:      OpConfluencePageGet,
+			Op:      OpConfluencePageDescribe,
 			Mutates: false,
 			Auth:    []string{"pat", "oauth"},
 			Args: Args{
 				Positional: []string{"pageID"},
 				Flags: []string{
-					"body-format",
 					"include-labels",
 					"include-properties",
 					"include-operations",
 					"include-versions",
 				},
+			},
+		},
+		{
+			Op:      OpConfluencePageView,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args: Args{
+				Positional: []string{"pageID"},
 			},
 		},
 		{
@@ -163,6 +174,7 @@ func confluenceDefinitions() []Definition {
 					"include-properties",
 					"include-operations",
 					"include-versions",
+					"raw",
 				},
 			},
 		},

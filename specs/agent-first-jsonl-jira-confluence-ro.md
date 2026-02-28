@@ -110,16 +110,18 @@ Base: `{site}/rest/api/3` (PAT mode).
 1) `atlas jira issue get <ISSUE_KEY>`
 - Endpoint: `GET /issue/{issueIdOrKey}`
 - Flags:
-  - `--fields` (comma list; default minimal)
+  - `--fields` (additional fields added to compact defaults; repeat flag to add multiple)
   - `--expand` (comma list; default empty)
-  - `--fields-by-keys` (bool; default true)
+  - `--raw` (emit full Jira issue payload; requests `fields=*all`)
 - Default `fields` (token-efficient): `summary,status,issuetype,priority,assignee,reporter,project,created,updated`
+- Requests always send `fieldsByKeys=true`
+- Output defaults to compact issue projection
 
 2) `atlas jira issue search --jql <JQL>`
 - Endpoint: `GET /search/jql`
 - Pagination: token-based via `nextPageToken` (loop until empty or `--limit` reached)
 - Flags:
-  - `--fields`, `--expand`, `--fields-by-keys` (same defaults as get)
+  - `--fields`, `--expand`, `--raw` (same defaults as get)
   - `--limit` (max items; default 50)
   - `--page-size` (API `maxResults`; default 50)
   - `--page-token` (start token; default empty)
@@ -137,8 +139,10 @@ Base: `{site}/wiki/api/v2` (PAT mode).
   - `--include-properties` (bool; default false)
   - `--include-operations` (bool; default false)
   - `--include-versions` (bool; default false)
+  - `--raw` (emit full Confluence payload; enables include/body options)
 
 Default `body-format=none` means do not request/emit page body.
+Output defaults to compact projection.
 
 2) `atlas confluence page search --cql <CQL>`
 - Endpoint: `GET /content/search?cql=...` (under v2 base)
@@ -148,6 +152,7 @@ Default `body-format=none` means do not request/emit page body.
   - `--page-size` (API `limit`; default 25)
   - `--cursor` (start cursor; default empty)
   - same include/body flags as `page get` (defaults token-efficient)
+  - `--raw` (emit full Confluence payload; enables include/body options)
 
 Stdout: one JSONL record per page with `op:"confluence.page.search"`.
 

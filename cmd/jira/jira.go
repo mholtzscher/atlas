@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	ufcli "github.com/urfave/cli/v3"
 
@@ -14,13 +15,13 @@ import (
 )
 
 const (
-	flagFields       = "fields"
-	flagExpand       = "expand"
-	flagFieldsByKeys = "fields-by-keys"
-	flagJQL          = "jql"
-	flagLimit        = "limit"
-	flagPageSize     = "page-size"
-	flagPageToken    = "page-token"
+	flagFields    = "fields"
+	flagExpand    = "expand"
+	flagJQL       = "jql"
+	flagLimit     = "limit"
+	flagPageSize  = "page-size"
+	flagPageToken = "page-token"
+	flagRaw       = "raw"
 )
 
 const (
@@ -46,7 +47,7 @@ func newIssueCommand() *ufcli.Command {
 		Name:  "issue",
 		Usage: "Issue operations",
 		Commands: []*ufcli.Command{
-			newIssueGetCommand(),
+			newIssueDescribeCommand(),
 			newIssueSearchCommand(),
 			newIssueCommentsCommand(),
 			newIssueTypesCommand(),
@@ -78,18 +79,18 @@ func newIssueCommentsCommand() *ufcli.Command {
 	}
 }
 
-func newIssueGetCommand() *ufcli.Command {
+func newIssueDescribeCommand() *ufcli.Command {
 	return &ufcli.Command{
-		Name:      "get",
-		Usage:     "Get issue by key",
+		Name:      "describe",
+		Usage:     "Describe issue by key",
 		ArgsUsage: "<ISSUE_KEY>",
 		Flags: []ufcli.Flag{
-			&ufcli.StringSliceFlag{Name: flagFields, Value: jiraops.DefaultFields(), Usage: "Issue fields"},
+			&ufcli.StringSliceFlag{Name: flagFields, Usage: "Additional issue fields (added to compact defaults)"},
 			&ufcli.StringSliceFlag{Name: flagExpand, Usage: "Expand fields"},
-			&ufcli.BoolFlag{Name: flagFieldsByKeys, Value: true, Usage: "Interpret fields by key"},
+			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
 		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraIssueGet, true)
+			deps, err := runtime.New(cmd, ops.OpJiraIssueDescribe, true)
 			if err != nil {
 				return err
 			}
@@ -98,17 +99,26 @@ func newIssueGetCommand() *ufcli.Command {
 				return errors.New("expected exactly one argument: <ISSUE_KEY>")
 			}
 
-			issue, getErr := jiraops.GetIssue(ctx, deps.Client, jiraops.GetIssueRequest{
-				IssueKey:     cmd.Args().First(),
-				Fields:       cmd.StringSlice(flagFields),
-				Expand:       cmd.StringSlice(flagExpand),
-				FieldsByKeys: cmd.Bool(flagFieldsByKeys),
+			issue, describeErr := jiraops.GetIssue(ctx, deps.Client, jiraops.GetIssueRequest{
+				IssueKey: cmd.Args().First(),
+				Fields:   cmd.StringSlice(flagFields),
+				Expand:   cmd.StringSlice(flagExpand),
+				Raw:      cmd.Bool(flagRaw),
 			})
-			if getErr != nil {
-				return getErr
+			if describeErr != nil {
+				return describeErr
 			}
 
-			return deps.Emitter.EmitRecord(ops.OpJiraIssueGet, issue)
+			if !cmd.Bool(flagRaw) {
+				compactIssue, compactErr := jiraops.CompactIssue(issue)
+				if compactErr != nil {
+					return fmt.Errorf("compact issue output: %w", compactErr)
+				}
+
+				issue = compactIssue
+			}
+
+			return deps.Emitter.EmitRecord(ops.OpJiraIssueDescribe, issue)
 		},
 	}
 }
@@ -119,9 +129,9 @@ func newIssueSearchCommand() *ufcli.Command {
 		Usage: "Search issues with JQL",
 		Flags: []ufcli.Flag{
 			&ufcli.StringFlag{Name: flagJQL, Usage: "JQL query", Required: true},
-			&ufcli.StringSliceFlag{Name: flagFields, Value: jiraops.DefaultFields(), Usage: "Issue fields"},
+			&ufcli.StringSliceFlag{Name: flagFields, Usage: "Additional issue fields (added to compact defaults)"},
 			&ufcli.StringSliceFlag{Name: flagExpand, Usage: "Expand fields"},
-			&ufcli.BoolFlag{Name: flagFieldsByKeys, Value: true, Usage: "Interpret fields by key"},
+			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
 			&ufcli.IntFlag{Name: flagLimit, Value: defaultLimit, Usage: "Max issues to emit"},
 			&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request"},
 			&ufcli.StringFlag{Name: flagPageToken, Usage: "Initial page token"},
@@ -133,14 +143,23 @@ func newIssueSearchCommand() *ufcli.Command {
 			}
 
 			return jiraops.SearchIssues(ctx, deps.Client, jiraops.SearchIssuesRequest{
-				JQL:          cmd.String(flagJQL),
-				Fields:       cmd.StringSlice(flagFields),
-				Expand:       cmd.StringSlice(flagExpand),
-				FieldsByKeys: cmd.Bool(flagFieldsByKeys),
-				Limit:        cmd.Int(flagLimit),
-				PageSize:     cmd.Int(flagPageSize),
-				PageToken:    cmd.String(flagPageToken),
+				JQL:       cmd.String(flagJQL),
+				Fields:    cmd.StringSlice(flagFields),
+				Expand:    cmd.StringSlice(flagExpand),
+				Raw:       cmd.Bool(flagRaw),
+				Limit:     cmd.Int(flagLimit),
+				PageSize:  cmd.Int(flagPageSize),
+				PageToken: cmd.String(flagPageToken),
 			}, func(issue json.RawMessage) error {
+				if !cmd.Bool(flagRaw) {
+					compactIssue, compactErr := jiraops.CompactIssue(issue)
+					if compactErr != nil {
+						return fmt.Errorf("compact issue output: %w", compactErr)
+					}
+
+					issue = compactIssue
+				}
+
 				return deps.Emitter.EmitRecord(ops.OpJiraIssueSearch, issue)
 			})
 		},
