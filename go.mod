@@ -3,6 +3,7 @@ module github.com/mholtzscher/atlas
 go 1.25
 
 require (
+	github.com/alpkeskin/gotoon v0.1.1
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
 	github.com/urfave/cli/v3 v3.6.2

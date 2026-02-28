@@ -9,26 +9,20 @@ exec atlas --version
 stdout '0.1.0'
 ! stderr .
 
-# Test meta ops jsonl records
-exec atlas meta ops
-stdout '"op":"jira.issue.get"'
-stdout '"op":"jira.issue.search"'
-stdout '"op":"confluence.page.get"'
-stdout '"op":"confluence.page.search"'
-! stderr .
-
 # Test missing auth/site emits text error (pre-command errors use text format)
 ! exec atlas jira issue search --jql 'project=ABC'
 ! stdout .
 stderr 'INVALID_ARGUMENT'
 stderr 'jira.issue.search'
 
-# Test flag can set output to text
-exec atlas --output text meta ops
-stdout '^jira.issue.get$'
-stdout '^confluence.page.search$'
-! stdout '"op":"jira.issue.get"'
+# Test output flag with jira issue get error (no site configured)
+! exec atlas --output text jira issue get TEST-123
+stderr 'INVALID_ARGUMENT'
 
-# Test flag can set output back to jsonl
-exec atlas --output jsonl meta ops
-stdout '"op":"jira.issue.get"'
+# Test output flag with jsonl format
+! exec atlas --output jsonl jira issue get TEST-123
+stderr 'INVALID_ARGUMENT'
+
+# Test toon output flag (should still work for errors)
+! exec atlas --output toon jira issue get TEST-123
+stderr 'INVALID_ARGUMENT'

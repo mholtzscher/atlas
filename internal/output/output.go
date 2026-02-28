@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/alpkeskin/gotoon"
+
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 )
 
@@ -14,10 +16,24 @@ const (
 	FormatJSONL Format = "jsonl"
 	// FormatText prints plain text output.
 	FormatText Format = "text"
+	// FormatToon prints TOON (Token-Oriented Object Notation) output.
+	FormatToon Format = "toon"
+
+	// DefaultToonIndent is the default indentation for TOON output.
+	DefaultToonIndent = 2
+	// DefaultToonDelimiter is the default delimiter for TOON output.
+	DefaultToonDelimiter = ","
 )
 
 // Format controls output encoding.
 type Format string
+
+// ToonOptions holds gotoon encoding configuration.
+type ToonOptions struct {
+	Indent       int
+	Delimiter    string
+	LengthMarker bool
+}
 
 type successRecord struct {
 	Op   string          `json:"op"`
@@ -26,17 +42,19 @@ type successRecord struct {
 
 // Emitter writes success and error output.
 type Emitter struct {
-	format Format
-	stdout io.Writer
-	stderr io.Writer
+	format   Format
+	toonOpts ToonOptions
+	stdout   io.Writer
+	stderr   io.Writer
 }
 
 // NewEmitter creates an output emitter for a format.
-func NewEmitter(format Format, stdout io.Writer, stderr io.Writer) Emitter {
+func NewEmitter(format Format, toonOpts ToonOptions, stdout io.Writer, stderr io.Writer) Emitter {
 	return Emitter{
-		format: format,
-		stdout: stdout,
-		stderr: stderr,
+		format:   format,
+		toonOpts: toonOpts,
+		stdout:   stdout,
+		stderr:   stderr,
 	}
 }
 
@@ -48,7 +66,7 @@ func ParseFormat(raw string) (Format, error) {
 
 	format := Format(raw)
 	switch format {
-	case FormatJSONL, FormatText:
+	case FormatJSONL, FormatText, FormatToon:
 		return format, nil
 	default:
 		return "", fmt.Errorf("invalid --output: %q", raw)
@@ -57,23 +75,51 @@ func ParseFormat(raw string) (Format, error) {
 
 // EmitRecord writes one operation record.
 func (e Emitter) EmitRecord(op string, data json.RawMessage) error {
-	if e.format == FormatText {
+	switch e.format {
+	case FormatText:
 		_, err := fmt.Fprintf(e.stdout, "%s\t%s\n", op, string(data))
+		return err
+
+	case FormatToon:
+		var v any
+		if err := json.Unmarshal(data, &v); err != nil {
+			return fmt.Errorf("unmarshal for toon encoding: %w", err)
+		}
+
+		var opts []gotoon.EncodeOption
+		if e.toonOpts.Indent != DefaultToonIndent {
+			opts = append(opts, gotoon.WithIndent(e.toonOpts.Indent))
+		}
+		if e.toonOpts.Delimiter != DefaultToonDelimiter {
+			opts = append(opts, gotoon.WithDelimiter(e.toonOpts.Delimiter))
+		}
+		if e.toonOpts.LengthMarker {
+			opts = append(opts, gotoon.WithLengthMarker())
+		}
+
+		encoded, err := gotoon.Encode(v, opts...)
+		if err != nil {
+			return fmt.Errorf("toon encoding: %w", err)
+		}
+
+		_, err = fmt.Fprintln(e.stdout, encoded)
+		return err
+
+	case FormatJSONL:
+		recordBytes, err := json.Marshal(successRecord{Op: op, Data: data})
+		if err != nil {
+			return fmt.Errorf("marshal success record: %w", err)
+		}
+		_, err = fmt.Fprintln(e.stdout, string(recordBytes))
 		return err
 	}
 
-	recordBytes, err := json.Marshal(successRecord{Op: op, Data: data})
-	if err != nil {
-		return fmt.Errorf("marshal success record: %w", err)
-	}
-
-	_, err = fmt.Fprintln(e.stdout, string(recordBytes))
-	return err
+	return fmt.Errorf("unknown format: %s", e.format)
 }
 
 // EmitError writes one error object.
 func (e Emitter) EmitError(err *atlaserr.Error) error {
-	if e.format == FormatText {
+	if e.format == FormatText || e.format == FormatToon {
 		if err.Op == "" {
 			_, writeErr := fmt.Fprintf(e.stderr, "%s: %s\n", err.Code, err.Message)
 			return writeErr

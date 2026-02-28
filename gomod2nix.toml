@@ -101,6 +101,10 @@ schema = 3
     version = 'v0.2.0'
     hash = 'sha256-BMY1LfF//XczEXYajBgQgDFiI02hZ0Mk1jZZqkTgiBY='
 
+  [mod.'github.com/alpkeskin/gotoon']
+    version = 'v0.1.1'
+    hash = 'sha256-rC4OBXhJm3+vP8ck7ga9SUjs/YP2QDxGV47y4KFEebA='
+
   [mod.'github.com/ashanbrown/forbidigo/v2']
     version = 'v2.3.0'
     hash = 'sha256-FvVXdMOPgYRbdAO+Ghyb3xgMwEUXLNS6SnYzjBO5RNc='

@@ -26,6 +26,12 @@ const (
 	FlagVerbose = "verbose"
 	// FlagNoColor disables color output.
 	FlagNoColor = "no-color"
+	// FlagToonIndent sets TOON indentation spaces.
+	FlagToonIndent = "toon-indent"
+	// FlagToonDelimiter sets TOON delimiter (comma, tab, pipe).
+	FlagToonDelimiter = "toon-delimiter"
+	// FlagToonLengthMarker adds # prefix to TOON array lengths.
+	FlagToonLengthMarker = "toon-length-marker"
 )
 
 const (
@@ -48,6 +54,7 @@ const (
 // GlobalOptions holds CLI flags shared across commands.
 type GlobalOptions struct {
 	Output   output.Format
+	Toon     ToonConfig
 	Site     string
 	Auth     string
 	Email    string
@@ -57,12 +64,33 @@ type GlobalOptions struct {
 	NoColor  bool
 }
 
+// ToonConfig holds gotoon encoding options.
+type ToonConfig struct {
+	Indent       int
+	Delimiter    string
+	LengthMarker bool
+}
+
 // GlobalOptionsFromCommand extracts global options from command.
 func GlobalOptionsFromCommand(cmd *ufcli.Command) GlobalOptions {
 	out, _ := output.ParseFormat(cmd.String(FlagOutput))
 
+	// Parse delimiter string to actual delimiter character
+	delimiter := ","
+	switch cmd.String(FlagToonDelimiter) {
+	case "tab":
+		delimiter = "\t"
+	case "pipe":
+		delimiter = "|"
+	}
+
 	return GlobalOptions{
-		Output:   out,
+		Output: out,
+		Toon: ToonConfig{
+			Indent:       cmd.Int(FlagToonIndent),
+			Delimiter:    delimiter,
+			LengthMarker: cmd.Bool(FlagToonLengthMarker),
+		},
 		Site:     cmd.String(FlagSite),
 		Auth:     cmd.String(FlagAuth),
 		Email:    cmd.String(FlagEmail),

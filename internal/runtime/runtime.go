@@ -23,7 +23,16 @@ type Dependencies struct {
 func New(cmd *ufcli.Command, operation string, needsNetwork bool) (Dependencies, error) {
 	options := cli.GlobalOptionsFromCommand(cmd)
 
-	emitter := output.NewEmitter(options.Output, cmd.Writer, cmd.ErrWriter)
+	emitter := output.NewEmitter(
+		options.Output,
+		output.ToonOptions{
+			Indent:       options.Toon.Indent,
+			Delimiter:    options.Toon.Delimiter,
+			LengthMarker: options.Toon.LengthMarker,
+		},
+		cmd.Writer,
+		cmd.ErrWriter,
+	)
 	deps := Dependencies{
 		Options: options,
 		Emitter: emitter,
