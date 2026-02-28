@@ -2,14 +2,25 @@ package confluence
 
 import (
 	"encoding/json"
+	"regexp"
 
 	"github.com/go-xmlfmt/xmlfmt"
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 )
 
+var (
+	// localIDRegex matches local-id="..." attributes in HTML.
+	localIDRegex = regexp.MustCompile(`\s+local-id="[^"]*"`)
+	// acLocalIDRegex matches ac:local-id="..." attributes.
+	acLocalIDRegex = regexp.MustCompile(`\s+ac:local-id="[^"]*"`)
+	// acNameRegex matches ac:name="..." attributes (often noise in storage format).
+	acNameRegex = regexp.MustCompile(`\s+ac:name="[^"]*"`)
+)
+
 // ExtractPageViewHTML extracts body.storage.value HTML from a Confluence page payload.
 // Using storage format which is cleaner than view format and lacks editor artifacts.
+// Returns cleaned HTML with Confluence-specific attributes removed.
 func ExtractPageViewHTML(page json.RawMessage) (string, error) {
 	fields := map[string]json.RawMessage{}
 	if err := json.Unmarshal(page, &fields); err != nil {
@@ -45,6 +56,16 @@ func PrettyPrintHTML(html string) string {
 	return xmlfmt.FormatXML(html, "", "  ")
 }
 
+// CleanHTML removes Confluence-specific attributes that add noise to output.
+// Strips local-id, ac:local-id, and ac:name attributes.
+func CleanHTML(html string) string {
+	// Remove attributes in order to avoid interference
+	cleaned := localIDRegex.ReplaceAllString(html, "")
+	cleaned = acLocalIDRegex.ReplaceAllString(cleaned, "")
+	cleaned = acNameRegex.ReplaceAllString(cleaned, "")
+	return cleaned
+}
+
 func extractFromStorage(bodyFields map[string]json.RawMessage) (string, bool) {
 	storage, storageExists := bodyFields["storage"]
 	if !storageExists {
@@ -66,7 +87,7 @@ func extractFromStorage(bodyFields map[string]json.RawMessage) (string, bool) {
 		return "", false
 	}
 
-	return html, true
+	return CleanHTML(html), true
 }
 
 func extractFromView(bodyFields map[string]json.RawMessage) (string, error) {
@@ -90,7 +111,7 @@ func extractFromView(bodyFields map[string]json.RawMessage) (string, error) {
 		return "", pageBodyViewMissingError()
 	}
 
-	return html, nil
+	return CleanHTML(html), nil
 }
 
 func pageBodyViewMissingError() error {
