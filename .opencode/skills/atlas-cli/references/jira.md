@@ -12,19 +12,19 @@ atlas jira issue describe PROJ-123 --raw   # full API payload
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `--fields` | string slice | Additional fields beyond compact defaults |
+| `--fields` | string slice | Additional fields beyond defaults |
 | `--expand` | string slice | Jira expand parameters |
-| `--raw` | bool | Full payload, skip compact projection |
+| `--raw` | bool | Full payload, skip field projection |
 
-### Default compact fields
+### Default fields
 
 `summary`, `status`, `issuetype`, `priority`, `assignee`, `reporter`, `project`, `created`, `updated`
 
 Additional `--fields` values are additive (merged with defaults, deduplicated).
 
-### Compact projection behavior
+### Field projection behavior
 
-In compact mode, known nested objects are collapsed to scalar values:
+By default, known nested objects are collapsed to scalar values:
 
 | Field | Projected to |
 |-------|-------------|

@@ -5,17 +5,19 @@ description: Interact with Atlassian Jira and Confluence via the atlas CLI. Use 
 
 # Atlas CLI
 
-Agent-first CLI for Atlassian Cloud products (Jira, Confluence). All operations are read-only.
+Use `atlas` to fetch Atlassian Cloud data (Jira, Confluence). Prefer read-only ops.
 
-## Authentication Policy
+## Hard Rules
 
-**NEVER read, write, or modify authentication config files** (`atlas.json`, `~/.config/atlas/atlas.json`). Never pass `--email`, `--api-token`, or `--site` flags inline. Auth is pre-configured by the user via environment variables or config files.
+- Auth: **NEVER read/write auth config** (`atlas.json`, `~/.config/atlas/atlas.json`). Never pass `--email`, `--api-token`, or `--site` inline.
+- Side effects: run only read-only commands unless user explicitly asks for create/update/delete.
+- Output: prefer `--output jsonl`; `atlas confluence page view` writes raw HTML/Markdown to stdout (not JSONL).
 
 If a command fails with `AUTH_FAILED`, `FORBIDDEN`, or missing `--site`, tell the user:
 
 > Authentication failed. Please check your atlas configuration. Run `atlas --help` or see the atlas docs for setup instructions.
 
-Do not attempt to fix auth issues, read config files, or suggest token values.
+Do not attempt to fix auth, read configs, or suggest token values.
 
 ## Quick Start
 
@@ -23,59 +25,32 @@ Do not attempt to fix auth issues, read config files, or suggest token values.
 atlas jira issue describe PROJ-123
 ```
 
-## Command Tree
+## Common Tasks (Pick The Smallest Command)
 
-```
-atlas
-├── jira
-│   ├── issue describe <KEY>     # Get issue details
-│   ├── issue search --jql "..." # Search issues with JQL
-│   ├── issue comments <KEY>     # Get issue comments
-│   ├── issue types              # List all issue types
-│   ├── project list             # List accessible projects
-│   └── myself                   # Current authenticated user
-└── confluence
-    ├── space list               # List accessible spaces
-    ├── space describe <KEY>     # Describe space by key
-    ├── page describe <ID>       # Page metadata by ID
-    ├── page view <ID>           # Page body content (HTML/markdown)
-    ├── page search --cql "..."  # Search pages with CQL
-    └── page comments <ID>       # Footer comments on a page
+Jira:
+
+```bash
+atlas jira issue describe PROJ-123
+atlas jira issue search --jql "project = PROJ AND status != Done" --limit 10
+atlas jira issue comments PROJ-123
+atlas jira project list
+atlas jira issue types
+atlas jira myself
 ```
 
-## Global Flags
+Confluence:
 
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--output` | `jsonl` | Format: `jsonl`, `text`, `toon` |
-| `--timeout` | `30s` | HTTP timeout |
-| `--verbose` | `false` | Log HTTP requests to stderr |
-| `--raw` | `false` | Emit full API payload (skip compact projection) |
-
-## Decision Tree
-
-```
-What do you need?
-├─ Jira data → See references/jira.md
-│   ├─ Specific issue details → jira issue describe
-│   ├─ Search/filter issues → jira issue search (needs JQL)
-│   ├─ Issue comments → jira issue comments
-│   └─ List projects/types → jira project list, jira issue types
-├─ Confluence data → See references/confluence.md
-│   ├─ Read page content → confluence page view
-│   ├─ Page metadata → confluence page describe
-│   ├─ Search pages → confluence page search (needs CQL)
-│   ├─ Page comments → confluence page comments
-│   └─ List/describe spaces → confluence space list/describe
-├─ Auth issues → Tell user to check their atlas config (never touch auth yourself)
-└─ Output/error handling → See references/output-and-errors.md
+```bash
+atlas confluence space list
+atlas confluence space describe DEV
+atlas confluence page describe 12345678
+atlas confluence page view 12345678 --format markdown
+atlas confluence page search --cql "space = DEV AND title ~ 'architecture'" --limit 10
+atlas confluence page comments 12345678
 ```
 
-## Key Concepts
+If the user doesn't provide JQL/CQL and you can't infer it safely, ask for the query.
 
-- **Compact mode** (default): Strips noisy fields from API responses to reduce token count. Use `--raw` for full payloads.
-- **JSONL output** (default): Each result is `{"data": ...}` on stdout, one per line. Errors go to stderr as `{"error": {...}}`.
-- **Pagination**: Controlled via `--limit` (total items) and `--page-size` (per-request batch). Results stream one-at-a-time.
 ## In This Reference
 
 | File | Purpose |
