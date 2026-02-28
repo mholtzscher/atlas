@@ -28,7 +28,3 @@ stderr 'INVALID_ARGUMENT'
 # Test output flag with jsonl format
 ! exec atlas --output jsonl jira issue describe TEST-123
 stderr 'INVALID_ARGUMENT'
-
-# Test toon output flag (should still work for errors)
-! exec atlas --output toon jira issue describe TEST-123
-stderr 'INVALID_ARGUMENT'

@@ -25,11 +25,6 @@ func New(cmd *ufcli.Command, needsNetwork bool) (Dependencies, error) {
 
 	emitter := output.NewEmitter(
 		options.Output,
-		output.ToonOptions{
-			Indent:       options.Toon.Indent,
-			Delimiter:    options.Toon.Delimiter,
-			LengthMarker: options.Toon.LengthMarker,
-		},
 		cmd.Writer,
 		cmd.ErrWriter,
 	)

@@ -4,7 +4,6 @@ go 1.25
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
-	github.com/alpkeskin/gotoon v0.1.1
 	github.com/go-xmlfmt/xmlfmt v1.1.3
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0

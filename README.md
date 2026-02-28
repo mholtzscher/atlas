@@ -29,7 +29,6 @@ Atlas provides programmatic access to Atlassian Cloud APIs with output formats o
 
 - **JSONL** (default): Newline-delimited JSON with operation identifiers
 - **Text**: Plain text tab-separated output
-- **TOON**: Token-Oriented Object Notation for compact structured output
 
 ### Configuration
 
@@ -109,12 +108,9 @@ atlas confluence page view 123456789
 
 | Setting | Default Value | Description |
 |---------|--------------|-------------|
-| `output` | `jsonl` | Output format (jsonl, text, toon) |
+| `output` | `jsonl` | Output format (jsonl or text) |
 | `auth` | `pat` | Authentication mode (pat or oauth) |
 | `timeout` | `30s` | HTTP request timeout |
-| `toon-indent` | `2` | TOON format indentation spaces |
-| `toon-delimiter` | `comma` | TOON format delimiter (comma, tab, pipe) |
-| `toon-length-marker` | `false` | Add # prefix to TOON array lengths |
 
 **Pagination Defaults:**
 - Jira issue search: 50 results per page, 50 max results

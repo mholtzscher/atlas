@@ -29,7 +29,7 @@
 
 ### Output model
 
-- `page describe` emits compact metadata record via existing emitter (`jsonl`/`text`/`toon`).
+- `page describe` emits compact metadata record via existing emitter (`jsonl` or `text`).
 - `page view` emits Markdown only to stdout (raw text stream, no `{op,data}` envelope).
 
 ### Conversion model

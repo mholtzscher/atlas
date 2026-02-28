@@ -23,7 +23,7 @@ Add three Confluence read operations to match existing Jira parity and unblock b
 |------------|----------|
 | API target | Confluence Cloud only (`/wiki/api/v2/...`) |
 | Auth | Reuse existing global auth (`pat` implemented; `oauth` allowlisted but unimplemented) |
-| Output formats | Reuse existing JSONL/text/toon emitters; no bespoke tables |
+| Output formats | Reuse existing JSONL/text emitters; no bespoke tables |
 | Output schema | Emit upstream JSON objects (pass-through) |
 | Pagination | Cursor-based, matching `confluence page search` (`--limit`, `--page-size`, `--cursor`) |
 | Comments scope | Footer comments only; include reply threads via children traversal |

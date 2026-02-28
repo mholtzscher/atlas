@@ -28,7 +28,7 @@ func TestScript(t *testing.T) {
 }
 
 func runAtlas(args []string) {
-	emitter := output.NewEmitter(output.FormatText, output.ToonOptions{}, os.Stdout, os.Stderr)
+	emitter := output.NewEmitter(output.FormatText, os.Stdout, os.Stderr)
 
 	if err := cmd.Run(context.Background(), args); err != nil {
 		_ = emitter.EmitError(normalizeError(err))

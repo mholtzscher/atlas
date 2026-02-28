@@ -14,7 +14,7 @@ import (
 func main() {
 	// Use default text format for pre-command error output.
 	// Command-specific output format is determined by the --output flag.
-	emitter := output.NewEmitter(output.FormatText, output.ToonOptions{}, os.Stdout, os.Stderr)
+	emitter := output.NewEmitter(output.FormatText, os.Stdout, os.Stderr)
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		atlasError := normalizeError(err)

@@ -23,7 +23,7 @@ Currently, the CLI only supports `jira issue get` and `jira issue search`.
 
 | Constraint | Decision |
 |------------|----------|
-| **Output formats** | Use existing JSONL/text/toon only |
+| **Output formats** | Use existing JSONL/text only |
 | **API target** | Jira Cloud only (v3 REST API) |
 | **Pagination** | None for MVP (return all results) |
 | **Scope** | 4 Jira operations, no Confluence yet |

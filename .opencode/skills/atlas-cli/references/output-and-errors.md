@@ -18,16 +18,6 @@ Each result on stdout: raw JSON string + newline.
 
 Errors on stderr: `CODE: message`
 
-### TOON (Token-Oriented Object Notation)
-
-Compact notation optimized for LLM token efficiency. Configurable via:
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--toon-indent` | `2` | Indentation spaces |
-| `--toon-delimiter` | `comma` | Delimiter: `comma`, `tab`, `pipe` |
-| `--toon-length-marker` | `false` | Add `#` prefix to array lengths |
-
 ### Special case: `confluence page view`
 
 Writes raw HTML or Markdown directly to stdout, bypassing the output format system entirely.

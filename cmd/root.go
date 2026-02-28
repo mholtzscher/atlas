@@ -78,11 +78,11 @@ func globalFlags() []ufcli.Flag {
 		&ufcli.StringFlag{
 			Name:    cli.FlagOutput,
 			Value:   string(output.FormatJSONL),
-			Usage:   "Output format (jsonl, text, or toon)",
+			Usage:   "Output format (jsonl or text)",
 			Sources: configSources(cli.FlagOutput),
 			Action: func(_ context.Context, _ *ufcli.Command, v string) error {
-				if v != "jsonl" && v != "text" && v != "toon" {
-					return fmt.Errorf("invalid --%s: %q (must be 'jsonl', 'text', or 'toon')", cli.FlagOutput, v)
+				if v != "jsonl" && v != "text" {
+					return fmt.Errorf("invalid --%s: %q (must be 'jsonl' or 'text')", cli.FlagOutput, v)
 				}
 				return nil
 			},
@@ -129,30 +129,6 @@ func globalFlags() []ufcli.Flag {
 			Name:    cli.FlagNoColor,
 			Usage:   "Disable colored output",
 			Sources: configSources(cli.FlagNoColor),
-		},
-		&ufcli.IntFlag{
-			Name:    cli.FlagToonIndent,
-			Value:   output.DefaultToonIndent,
-			Usage:   "TOON indentation spaces",
-			Sources: configSources(cli.FlagToonIndent),
-		},
-		&ufcli.StringFlag{
-			Name:    cli.FlagToonDelimiter,
-			Value:   "comma",
-			Usage:   "TOON delimiter (comma, tab, or pipe)",
-			Sources: configSources(cli.FlagToonDelimiter),
-			Action: func(_ context.Context, _ *ufcli.Command, v string) error {
-				if v != "comma" && v != "tab" && v != "pipe" {
-					return fmt.Errorf("invalid --%s: %q (must be 'comma', 'tab', or 'pipe')", cli.FlagToonDelimiter, v)
-				}
-				return nil
-			},
-		},
-		&ufcli.BoolFlag{
-			Name:    cli.FlagToonLengthMarker,
-			Value:   false,
-			Usage:   "Add # prefix to TOON array lengths",
-			Sources: configSources(cli.FlagToonLengthMarker),
 		},
 	}
 }
