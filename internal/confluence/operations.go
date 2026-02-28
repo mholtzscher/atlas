@@ -21,7 +21,17 @@ const (
 const (
 	// BodyFormatNone avoids requesting body content.
 	BodyFormatNone = "none"
-	defaultLimit   = 25
+	// BodyFormatStorage returns XHTML storage format.
+	BodyFormatStorage = "storage"
+	// BodyFormatEditor returns editor format.
+	BodyFormatEditor = "editor"
+	// BodyFormatExportView returns export view format.
+	BodyFormatExportView = "export_view"
+	// BodyFormatView returns view format.
+	BodyFormatView = "view"
+	// BodyFormatAtlasDocFormat returns Atlas Document Format (ADF).
+	BodyFormatAtlasDocFormat = "atlas_doc_format"
+	defaultLimit             = 25
 )
 
 type pageSearchResponse struct {

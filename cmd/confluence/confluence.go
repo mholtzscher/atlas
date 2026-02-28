@@ -115,7 +115,11 @@ func newPageSearchCommand() *ufcli.Command {
 
 func pageFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.StringFlag{Name: flagBodyFormat, Value: confluenceops.BodyFormatNone, Usage: "Body format"},
+		&ufcli.StringFlag{
+			Name:  flagBodyFormat,
+			Value: confluenceops.BodyFormatView,
+			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
+		},
 		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
 		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
 		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
