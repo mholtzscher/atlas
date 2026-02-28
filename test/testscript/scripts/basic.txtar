@@ -21,14 +21,14 @@ stdout 'view'
 stderr 'INVALID_ARGUMENT'
 stderr 'jira.issue.search'
 
-# Test output flag with jira issue get error (no site configured)
-! exec atlas --output text jira issue get TEST-123
+# Test output flag with jira issue describe error (no site configured)
+! exec atlas --output text jira issue describe TEST-123
 stderr 'INVALID_ARGUMENT'
 
 # Test output flag with jsonl format
-! exec atlas --output jsonl jira issue get TEST-123
+! exec atlas --output jsonl jira issue describe TEST-123
 stderr 'INVALID_ARGUMENT'
 
 # Test toon output flag (should still work for errors)
-! exec atlas --output toon jira issue get TEST-123
+! exec atlas --output toon jira issue describe TEST-123
 stderr 'INVALID_ARGUMENT'

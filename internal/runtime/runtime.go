@@ -45,7 +45,7 @@ func New(cmd *ufcli.Command, needsNetwork bool) (Dependencies, error) {
 
 	if options.Site == "" {
 		return Dependencies{}, atlaserr.InvalidArgument(
-			fmt.Sprintf("missing required --%s or %s", cli.FlagSite, cli.EnvSite),
+			fmt.Sprintf("%s: missing required --%s or %s", cmd.FullName(), cli.FlagSite, cli.EnvSite),
 		)
 	}
 
