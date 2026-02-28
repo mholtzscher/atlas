@@ -1,0 +1,63 @@
+version: 2
+
+project_name: atlas
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: atlas
+    main: .
+    binary: atlas
+    ldflags:
+      - -s -w
+      - -X github.com/mholtzscher/atlas/cmd.Version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: github-native
+
+brews:
+  - name: atlas
+    repository:
+      owner: mholtzscher
+      name: homebrew-tap
+      token: "{{ .Env.PAT }}"
+    directory: Formula
+    homepage: "https://github.com/mholtzscher/atlas"
+    description: "Agent first CLI for Atlassian products"
+    license: "MIT"
+    install: |
+      bin.install "atlas"
+    test: |
+      system "#{bin}/atlas", "--version"
+
+
+release:
+  github:
+    owner: mholtzscher
+    name: atlas
+  prerelease: auto
+  name_template: "v{{.Version}}"
