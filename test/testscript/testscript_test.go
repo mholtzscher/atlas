@@ -43,5 +43,5 @@ func normalizeError(err error) *atlaserr.Error {
 		return structuredError
 	}
 
-	return atlaserr.InvalidArgument(err.Error(), "")
+	return atlaserr.InvalidArgument(err.Error())
 }

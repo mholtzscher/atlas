@@ -6,7 +6,6 @@ import (
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	confluenceops "github.com/mholtzscher/atlas/internal/confluence"
-	"github.com/mholtzscher/atlas/internal/ops"
 )
 
 func TestExtractPageViewHTML(t *testing.T) {
@@ -81,10 +80,6 @@ func assertPageViewError(t *testing.T, err error, expectedMessage string) {
 
 	if atlasError.Code != atlaserr.CodeUpstreamError {
 		t.Fatalf("expected code %s, got %s", atlaserr.CodeUpstreamError, atlasError.Code)
-	}
-
-	if atlasError.Op != ops.OpConfluencePageView {
-		t.Fatalf("expected op %s, got %s", ops.OpConfluencePageView, atlasError.Op)
 	}
 
 	if atlasError.Message != expectedMessage {

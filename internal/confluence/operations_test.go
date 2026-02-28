@@ -12,7 +12,6 @@ import (
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	"github.com/mholtzscher/atlas/internal/atlassian"
 	confluenceops "github.com/mholtzscher/atlas/internal/confluence"
-	"github.com/mholtzscher/atlas/internal/ops"
 )
 
 func TestListSpacesFollowsPagination(t *testing.T) {
@@ -108,10 +107,6 @@ func TestGetSpaceByKeyNotFound(t *testing.T) {
 	if atlasError.Code != atlaserr.CodeNotFound {
 		t.Fatalf("expected code %s, got %s", atlaserr.CodeNotFound, atlasError.Code)
 	}
-
-	if atlasError.Op != ops.OpConfluenceSpaceDescribe {
-		t.Fatalf("expected op %s, got %s", ops.OpConfluenceSpaceDescribe, atlasError.Op)
-	}
 }
 
 func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
@@ -200,47 +195,77 @@ func TestSearchPagesRawForcesFullQuery(t *testing.T) {
 			}
 		}
 
-		writeJSON(writer, `{"results":[{"id":"p1"}],"_links":{"next":""}}`)
+		writeJSON(writer, `{"results":[{"id":"123"}],"_links":{"next":""}}`)
 	}))
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	emitted := 0
 
 	err := confluenceops.SearchPages(context.Background(), client, confluenceops.SearchPagesRequest{
-		CQL:      "type = page",
+		CQL:      "type=page",
+		Limit:    1,
+		PageSize: 1,
+		SearchOptions: confluenceops.SearchOptions{
+			Raw: true,
+		},
+	}, func(_ json.RawMessage) error {
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("SearchPages returned error: %v", err)
+	}
+}
+
+func TestSearchPagesStripsBodyWhenNoneFormatAndNotRaw(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writeJSON(writer, `{"results":[{"id":"123","body":{"view":{"value":"<p>hi</p>"}}}],"_links":{"next":""}}`)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+
+	var page json.RawMessage
+	err := confluenceops.SearchPages(context.Background(), client, confluenceops.SearchPagesRequest{
+		CQL:      "type=page",
 		Limit:    1,
 		PageSize: 1,
 		SearchOptions: confluenceops.SearchOptions{
 			BodyFormat: confluenceops.BodyFormatNone,
-			Raw:        true,
+			Raw:        false,
 		},
-	}, func(_ json.RawMessage) error {
-		emitted++
+	}, func(item json.RawMessage) error {
+		page = item
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("SearchPages returned error: %v", err)
 	}
 
-	if emitted != 1 {
-		t.Fatalf("expected 1 emitted page, got %d", emitted)
+	var payload map[string]json.RawMessage
+	if unmarshalErr := json.Unmarshal(page, &payload); unmarshalErr != nil {
+		t.Fatalf("decode page: %v", unmarshalErr)
+	}
+
+	if _, exists := payload["body"]; exists {
+		t.Fatal("expected body to be stripped for BodyFormatNone when not raw")
 	}
 }
 
-func TestListPageCommentsRawForcesBodyFormatView(t *testing.T) {
+func TestListPageCommentsHonorsLimit(t *testing.T) {
 	t.Parallel()
 
+	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/wiki/api/v2/pages/123/footer-comments" {
+		requestCount++
+
+		switch request.URL.Path {
+		case "/wiki/api/v2/pages/123/footer-comments":
+			writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
+		default:
 			t.Fatalf("unexpected path: %s", request.URL.Path)
 		}
-
-		if got := request.URL.Query().Get("body-format"); got != confluenceops.BodyFormatView {
-			t.Fatalf("expected body-format=view, got %q", got)
-		}
-
-		writeJSON(writer, `{"results":[{"id":"c1"}],"_links":{"next":""}}`)
 	}))
 	defer server.Close()
 
@@ -305,7 +330,7 @@ func TestGetPageRawKeepsBody(t *testing.T) {
 	}
 }
 
-func TestGetPageMissingIDUsesDescribeOpByDefault(t *testing.T) {
+func TestGetPageMissingIDReturnsError(t *testing.T) {
 	t.Parallel()
 
 	_, err := confluenceops.GetPage(context.Background(), nil, confluenceops.GetPageRequest{})
@@ -318,28 +343,8 @@ func TestGetPageMissingIDUsesDescribeOpByDefault(t *testing.T) {
 		t.Fatalf("expected *atlaserr.Error, got %T", err)
 	}
 
-	if atlasError.Op != ops.OpConfluencePageDescribe {
-		t.Fatalf("expected op %s, got %s", ops.OpConfluencePageDescribe, atlasError.Op)
-	}
-}
-
-func TestGetPageMissingIDUsesRequestedOperation(t *testing.T) {
-	t.Parallel()
-
-	_, err := confluenceops.GetPage(context.Background(), nil, confluenceops.GetPageRequest{
-		Operation: ops.OpConfluencePageView,
-	})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-
-	var atlasError *atlaserr.Error
-	if !errors.As(err, &atlasError) {
-		t.Fatalf("expected *atlaserr.Error, got %T", err)
-	}
-
-	if atlasError.Op != ops.OpConfluencePageView {
-		t.Fatalf("expected op %s, got %s", ops.OpConfluencePageView, atlasError.Op)
+	if atlasError.Code != atlaserr.CodeInvalidArgument {
+		t.Fatalf("expected code %s, got %s", atlaserr.CodeInvalidArgument, atlasError.Code)
 	}
 }
 

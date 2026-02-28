@@ -36,7 +36,6 @@ type ToonOptions struct {
 }
 
 type successRecord struct {
-	Op   string          `json:"op"`
 	Data json.RawMessage `json:"data"`
 }
 
@@ -74,10 +73,10 @@ func ParseFormat(raw string) (Format, error) {
 }
 
 // EmitRecord writes one operation record.
-func (e Emitter) EmitRecord(op string, data json.RawMessage) error {
+func (e Emitter) EmitRecord(data json.RawMessage) error {
 	switch e.format {
 	case FormatText:
-		_, err := fmt.Fprintf(e.stdout, "%s\t%s\n", op, string(data))
+		_, err := fmt.Fprintf(e.stdout, "%s\n", string(data))
 		return err
 
 	case FormatToon:
@@ -106,7 +105,7 @@ func (e Emitter) EmitRecord(op string, data json.RawMessage) error {
 		return err
 
 	case FormatJSONL:
-		recordBytes, err := json.Marshal(successRecord{Op: op, Data: data})
+		recordBytes, err := json.Marshal(successRecord{Data: data})
 		if err != nil {
 			return fmt.Errorf("marshal success record: %w", err)
 		}
@@ -120,12 +119,7 @@ func (e Emitter) EmitRecord(op string, data json.RawMessage) error {
 // EmitError writes one error object.
 func (e Emitter) EmitError(err *atlaserr.Error) error {
 	if e.format == FormatText || e.format == FormatToon {
-		if err.Op == "" {
-			_, writeErr := fmt.Fprintf(e.stderr, "%s: %s\n", err.Code, err.Message)
-			return writeErr
-		}
-
-		_, writeErr := fmt.Fprintf(e.stderr, "%s (%s): %s\n", err.Code, err.Op, err.Message)
+		_, writeErr := fmt.Fprintf(e.stderr, "%s: %s\n", err.Code, err.Message)
 		return writeErr
 	}
 

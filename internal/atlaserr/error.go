@@ -34,7 +34,6 @@ const (
 type Error struct {
 	Code      Code
 	Message   string
-	Op        string
 	Retryable bool
 	Details   json.RawMessage
 }
@@ -42,7 +41,6 @@ type Error struct {
 type errorBody struct {
 	Code      Code            `json:"code"`
 	Message   string          `json:"message"`
-	Op        string          `json:"op,omitempty"`
 	Retryable bool            `json:"retryable"`
 	Details   json.RawMessage `json:"details"`
 }
@@ -53,42 +51,41 @@ type ErrorEnvelope struct {
 }
 
 // New builds a structured error.
-func New(code Code, message string, op string, retryable bool, details json.RawMessage) *Error {
+func New(code Code, message string, retryable bool, details json.RawMessage) *Error {
 	return &Error{
 		Code:      code,
 		Message:   message,
-		Op:        op,
 		Retryable: retryable,
 		Details:   normalizeDetails(details),
 	}
 }
 
 // InvalidArgument builds an invalid argument error.
-func InvalidArgument(message string, op string) *Error {
-	return New(CodeInvalidArgument, message, op, false, nil)
+func InvalidArgument(message string) *Error {
+	return New(CodeInvalidArgument, message, false, nil)
 }
 
 // Network builds a network error.
-func Network(op string, err error) *Error {
-	return New(CodeNetworkError, err.Error(), op, true, nil)
+func Network(err error) *Error {
+	return New(CodeNetworkError, err.Error(), true, nil)
 }
 
 // FromHTTPStatus maps an HTTP status to a structured error.
-func FromHTTPStatus(op string, statusCode int, headers http.Header) *Error {
+func FromHTTPStatus(statusCode int, headers http.Header) *Error {
 	message := fmt.Sprintf("upstream returned %d", statusCode)
 
 	switch statusCode {
 	case http.StatusUnauthorized:
-		return New(CodeAuthFailed, message, op, false, nil)
+		return New(CodeAuthFailed, message, false, nil)
 	case http.StatusForbidden:
-		return New(CodeForbidden, message, op, false, nil)
+		return New(CodeForbidden, message, false, nil)
 	case http.StatusNotFound:
-		return New(CodeNotFound, message, op, false, nil)
+		return New(CodeNotFound, message, false, nil)
 	case http.StatusTooManyRequests:
-		return New(CodeRateLimited, message, op, true, retryAfterDetails(headers))
+		return New(CodeRateLimited, message, true, retryAfterDetails(headers))
 	default:
 		retryable := statusCode >= http.StatusInternalServerError
-		return New(CodeUpstreamError, message, op, retryable, nil)
+		return New(CodeUpstreamError, message, retryable, nil)
 	}
 }
 
@@ -98,7 +95,6 @@ func (e *Error) Envelope() ErrorEnvelope {
 		Error: errorBody{
 			Code:      e.Code,
 			Message:   e.Message,
-			Op:        e.Op,
 			Retryable: e.Retryable,
 			Details:   normalizeDetails(e.Details),
 		},
@@ -107,11 +103,7 @@ func (e *Error) Envelope() ErrorEnvelope {
 
 // Error returns a compact text representation.
 func (e *Error) Error() string {
-	if e.Op == "" {
-		return fmt.Sprintf("%s: %s", e.Code, e.Message)
-	}
-
-	return fmt.Sprintf("%s (%s): %s", e.Code, e.Op, e.Message)
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
 func normalizeDetails(details json.RawMessage) json.RawMessage {

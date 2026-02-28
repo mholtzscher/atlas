@@ -6,7 +6,6 @@ import (
 	"github.com/go-xmlfmt/xmlfmt"
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
-	"github.com/mholtzscher/atlas/internal/ops"
 )
 
 // ExtractPageViewHTML extracts body.storage.value HTML from a Confluence page payload.
@@ -17,7 +16,6 @@ func ExtractPageViewHTML(page json.RawMessage) (string, error) {
 		return "", atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Confluence page JSON",
-			ops.OpConfluencePageView,
 			false,
 			nil,
 		)
@@ -99,7 +97,6 @@ func pageBodyViewMissingError() error {
 	return atlaserr.New(
 		atlaserr.CodeUpstreamError,
 		"page body view missing",
-		ops.OpConfluencePageView,
 		false,
 		nil,
 	)

@@ -10,7 +10,6 @@ import (
 	ufcli "github.com/urfave/cli/v3"
 
 	jiraops "github.com/mholtzscher/atlas/internal/jira"
-	"github.com/mholtzscher/atlas/internal/ops"
 	"github.com/mholtzscher/atlas/internal/runtime"
 )
 
@@ -61,7 +60,7 @@ func newIssueCommentsCommand() *ufcli.Command {
 		Usage:     "Get comments on an issue",
 		ArgsUsage: "<ISSUE_KEY>",
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraIssueComments, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -73,7 +72,7 @@ func newIssueCommentsCommand() *ufcli.Command {
 			return jiraops.GetIssueComments(ctx, deps.Client, jiraops.GetIssueCommentsRequest{
 				IssueKey: cmd.Args().First(),
 			}, func(comment json.RawMessage) error {
-				return deps.Emitter.EmitRecord(ops.OpJiraIssueComments, comment)
+				return deps.Emitter.EmitRecord(comment)
 			})
 		},
 	}
@@ -90,7 +89,7 @@ func newIssueDescribeCommand() *ufcli.Command {
 			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
 		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraIssueDescribe, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -118,7 +117,7 @@ func newIssueDescribeCommand() *ufcli.Command {
 				issue = compactIssue
 			}
 
-			return deps.Emitter.EmitRecord(ops.OpJiraIssueDescribe, issue)
+			return deps.Emitter.EmitRecord(issue)
 		},
 	}
 }
@@ -137,7 +136,7 @@ func newIssueSearchCommand() *ufcli.Command {
 			&ufcli.StringFlag{Name: flagPageToken, Usage: "Initial page token"},
 		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraIssueSearch, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -160,7 +159,7 @@ func newIssueSearchCommand() *ufcli.Command {
 					issue = compactIssue
 				}
 
-				return deps.Emitter.EmitRecord(ops.OpJiraIssueSearch, issue)
+				return deps.Emitter.EmitRecord(issue)
 			})
 		},
 	}
@@ -181,7 +180,7 @@ func newProjectListCommand() *ufcli.Command {
 		Name:  "list",
 		Usage: "List all accessible projects",
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraProjectList, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -191,7 +190,7 @@ func newProjectListCommand() *ufcli.Command {
 				deps.Client,
 				jiraops.ListProjectsRequest{},
 				func(project json.RawMessage) error {
-					return deps.Emitter.EmitRecord(ops.OpJiraProjectList, project)
+					return deps.Emitter.EmitRecord(project)
 				},
 			)
 		},
@@ -203,7 +202,7 @@ func newMyselfCommand() *ufcli.Command {
 		Name:  "myself",
 		Usage: "Get current user information",
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraMyself, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -213,7 +212,7 @@ func newMyselfCommand() *ufcli.Command {
 				return getErr
 			}
 
-			return deps.Emitter.EmitRecord(ops.OpJiraMyself, user)
+			return deps.Emitter.EmitRecord(user)
 		},
 	}
 }
@@ -223,7 +222,7 @@ func newIssueTypesCommand() *ufcli.Command {
 		Name:  "types",
 		Usage: "List all issue types",
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpJiraIssueTypes, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -233,7 +232,7 @@ func newIssueTypesCommand() *ufcli.Command {
 				deps.Client,
 				jiraops.ListIssueTypesRequest{},
 				func(issueType json.RawMessage) error {
-					return deps.Emitter.EmitRecord(ops.OpJiraIssueTypes, issueType)
+					return deps.Emitter.EmitRecord(issueType)
 				},
 			)
 		},

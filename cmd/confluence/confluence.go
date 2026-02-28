@@ -10,7 +10,6 @@ import (
 	ufcli "github.com/urfave/cli/v3"
 
 	confluenceops "github.com/mholtzscher/atlas/internal/confluence"
-	"github.com/mholtzscher/atlas/internal/ops"
 	"github.com/mholtzscher/atlas/internal/runtime"
 )
 
@@ -77,7 +76,7 @@ func newSpaceListCommand() *ufcli.Command {
 		Usage: "List accessible spaces",
 		Flags: flags,
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluenceSpaceList, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -93,7 +92,7 @@ func newSpaceListCommand() *ufcli.Command {
 				}
 
 				space = compactSpace
-				return deps.Emitter.EmitRecord(ops.OpConfluenceSpaceList, space)
+				return deps.Emitter.EmitRecord(space)
 			})
 		},
 	}
@@ -106,7 +105,7 @@ func newSpaceDescribeCommand() *ufcli.Command {
 		ArgsUsage: "<SPACE_KEY>",
 		Flags:     []ufcli.Flag{&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"}},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluenceSpaceDescribe, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -129,7 +128,7 @@ func newSpaceDescribeCommand() *ufcli.Command {
 
 			space = compactSpace
 
-			return deps.Emitter.EmitRecord(ops.OpConfluenceSpaceDescribe, space)
+			return deps.Emitter.EmitRecord(space)
 		},
 	}
 }
@@ -141,7 +140,7 @@ func newPageDescribeCommand() *ufcli.Command {
 		ArgsUsage: "<PAGE_ID>",
 		Flags:     pageDescribeFlags(),
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluencePageDescribe, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -165,7 +164,7 @@ func newPageDescribeCommand() *ufcli.Command {
 
 			page = compactPage
 
-			return deps.Emitter.EmitRecord(ops.OpConfluencePageDescribe, page)
+			return deps.Emitter.EmitRecord(page)
 		},
 	}
 }
@@ -176,7 +175,7 @@ func newPageViewCommand() *ufcli.Command {
 		Usage:     "Show page body content (formatted HTML)",
 		ArgsUsage: "<PAGE_ID>",
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluencePageView, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -190,7 +189,6 @@ func newPageViewCommand() *ufcli.Command {
 				SearchOptions: confluenceops.SearchOptions{
 					BodyFormat: confluenceops.BodyFormatStorage,
 				},
-				Operation: ops.OpConfluencePageView,
 			})
 			if getErr != nil {
 				return getErr
@@ -221,7 +219,7 @@ func newPageSearchCommand() *ufcli.Command {
 		Usage: "Search pages with CQL",
 		Flags: flags,
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluencePageSearch, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -239,7 +237,7 @@ func newPageSearchCommand() *ufcli.Command {
 				}
 
 				page = compactPage
-				return deps.Emitter.EmitRecord(ops.OpConfluencePageSearch, page)
+				return deps.Emitter.EmitRecord(page)
 			})
 		},
 	}
@@ -255,7 +253,7 @@ func newPageCommentsCommand() *ufcli.Command {
 		ArgsUsage: "<PAGE_ID>",
 		Flags:     flags,
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
-			deps, err := runtime.New(cmd, ops.OpConfluencePageComments, true)
+			deps, err := runtime.New(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -278,7 +276,7 @@ func newPageCommentsCommand() *ufcli.Command {
 				}
 
 				comment = compactComment
-				return deps.Emitter.EmitRecord(ops.OpConfluencePageComments, comment)
+				return deps.Emitter.EmitRecord(comment)
 			})
 		},
 	}

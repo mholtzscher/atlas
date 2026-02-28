@@ -90,38 +90,37 @@ func (c *Client) Get(
 	ctx context.Context,
 	path string,
 	query url.Values,
-	op string,
 ) ([]byte, error) {
 	resolvedURL, err := c.resolveURL(path)
 	if err != nil {
-		return nil, atlaserr.InvalidArgument(err.Error(), op)
+		return nil, atlaserr.InvalidArgument(err.Error())
 	}
 
 	resolvedURL.RawQuery = query.Encode()
-	return c.getResolvedURL(ctx, resolvedURL, op)
+	return c.getResolvedURL(ctx, resolvedURL)
 }
 
 // GetURL sends a GET request using an absolute or site-relative URL.
-func (c *Client) GetURL(ctx context.Context, requestURL string, op string) ([]byte, error) {
+func (c *Client) GetURL(ctx context.Context, requestURL string) ([]byte, error) {
 	resolvedURL, err := c.resolveURL(requestURL)
 	if err != nil {
-		return nil, atlaserr.InvalidArgument(err.Error(), op)
+		return nil, atlaserr.InvalidArgument(err.Error())
 	}
 
-	return c.getResolvedURL(ctx, resolvedURL, op)
+	return c.getResolvedURL(ctx, resolvedURL)
 }
 
-func (c *Client) getResolvedURL(ctx context.Context, resolvedURL *url.URL, op string) ([]byte, error) {
+func (c *Client) getResolvedURL(ctx context.Context, resolvedURL *url.URL) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, resolvedURL.String(), nil)
 	if err != nil {
-		return nil, atlaserr.InvalidArgument(fmt.Sprintf("build request: %v", err), op)
+		return nil, atlaserr.InvalidArgument(fmt.Sprintf("build request: %v", err))
 	}
 
 	request.Header.Set(acceptHeader, acceptJSON)
 	request.Header.Set(userAgentHeader, c.userAgent)
 
 	if authErr := c.authenticator.Apply(request); authErr != nil {
-		return nil, atlaserr.InvalidArgument(authErr.Error(), op)
+		return nil, atlaserr.InvalidArgument(authErr.Error())
 	}
 
 	if c.verbose {
@@ -130,7 +129,7 @@ func (c *Client) getResolvedURL(ctx context.Context, resolvedURL *url.URL, op st
 
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, atlaserr.Network(op, err)
+		return nil, atlaserr.Network(err)
 	}
 
 	defer func() {
@@ -139,14 +138,14 @@ func (c *Client) getResolvedURL(ctx context.Context, resolvedURL *url.URL, op st
 
 	body, readErr := io.ReadAll(response.Body)
 	if readErr != nil {
-		return nil, atlaserr.Network(op, readErr)
+		return nil, atlaserr.Network(readErr)
 	}
 
 	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
 		return body, nil
 	}
 
-	return nil, atlaserr.FromHTTPStatus(op, response.StatusCode, response.Header)
+	return nil, atlaserr.FromHTTPStatus(response.StatusCode, response.Header)
 }
 
 func (c *Client) resolveURL(pathOrURL string) (*url.URL, error) {

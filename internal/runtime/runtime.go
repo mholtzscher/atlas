@@ -20,7 +20,7 @@ type Dependencies struct {
 }
 
 // New creates runtime dependencies for a command operation.
-func New(cmd *ufcli.Command, operation string, needsNetwork bool) (Dependencies, error) {
+func New(cmd *ufcli.Command, needsNetwork bool) (Dependencies, error) {
 	options := cli.GlobalOptionsFromCommand(cmd)
 
 	emitter := output.NewEmitter(
@@ -46,13 +46,12 @@ func New(cmd *ufcli.Command, operation string, needsNetwork bool) (Dependencies,
 	if options.Site == "" {
 		return Dependencies{}, atlaserr.InvalidArgument(
 			fmt.Sprintf("missing required --%s or %s", cli.FlagSite, cli.EnvSite),
-			operation,
 		)
 	}
 
 	authenticator, authErr := buildAuthenticator(options)
 	if authErr != nil {
-		return Dependencies{}, atlaserr.InvalidArgument(authErr.Error(), operation)
+		return Dependencies{}, atlaserr.InvalidArgument(authErr.Error())
 	}
 
 	client, clientErr := atlassian.NewClient(atlassian.ClientConfig{
@@ -64,7 +63,7 @@ func New(cmd *ufcli.Command, operation string, needsNetwork bool) (Dependencies,
 		UserAgent:     fmt.Sprintf("atlas/%s", cmd.Root().Version),
 	})
 	if clientErr != nil {
-		return Dependencies{}, atlaserr.InvalidArgument(clientErr.Error(), operation)
+		return Dependencies{}, atlaserr.InvalidArgument(clientErr.Error())
 	}
 
 	deps.Client = client

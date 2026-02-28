@@ -11,7 +11,6 @@ import (
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	"github.com/mholtzscher/atlas/internal/atlassian"
-	"github.com/mholtzscher/atlas/internal/ops"
 )
 
 const (
@@ -60,8 +59,7 @@ type SearchOptions struct {
 type GetPageRequest struct {
 	SearchOptions
 
-	PageID    string
-	Operation string
+	PageID string
 }
 
 // SearchPagesRequest defines page search inputs.
@@ -102,35 +100,24 @@ func GetPage(
 	client *atlassian.Client,
 	request GetPageRequest,
 ) (json.RawMessage, error) {
-	operation := resolveGetPageOperation(request)
-
 	if request.PageID == "" {
-		return nil, atlaserr.InvalidArgument("missing page ID", operation)
+		return nil, atlaserr.InvalidArgument("missing page ID")
 	}
 
 	body, err := client.Get(
 		ctx,
 		pageGetPathPrefix+url.PathEscape(request.PageID),
 		buildQuery(request.SearchOptions),
-		operation,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	if request.BodyFormat == BodyFormatNone && !request.Raw {
-		return removeBody(json.RawMessage(body), operation)
+		return removeBody(json.RawMessage(body))
 	}
 
 	return json.RawMessage(body), nil
-}
-
-func resolveGetPageOperation(request GetPageRequest) string {
-	if request.Operation != "" {
-		return request.Operation
-	}
-
-	return ops.OpConfluencePageDescribe
 }
 
 // SearchPages streams pages from CQL search.
@@ -182,11 +169,11 @@ func ListSpaces(
 	emit func(item json.RawMessage) error,
 ) error {
 	if request.Limit < 0 {
-		return atlaserr.InvalidArgument("--limit must be >= 0", ops.OpConfluenceSpaceList)
+		return atlaserr.InvalidArgument("--limit must be >= 0")
 	}
 
 	if request.PageSize <= 0 {
-		return atlaserr.InvalidArgument("--page-size must be > 0", ops.OpConfluenceSpaceList)
+		return atlaserr.InvalidArgument("--page-size must be > 0")
 	}
 
 	if request.Limit == 0 {
@@ -201,7 +188,6 @@ func ListSpaces(
 			ctx,
 			client,
 			nextURL,
-			ops.OpConfluenceSpaceList,
 			"invalid Confluence spaces response JSON",
 		)
 		if pageErr != nil {
@@ -232,21 +218,20 @@ func GetSpaceByKey(
 	request GetSpaceByKeyRequest,
 ) (json.RawMessage, error) {
 	if request.SpaceKey == "" {
-		return nil, atlaserr.InvalidArgument("missing space key", ops.OpConfluenceSpaceDescribe)
+		return nil, atlaserr.InvalidArgument("missing space key")
 	}
 
 	lookupQuery := url.Values{}
 	lookupQuery.Set("keys", request.SpaceKey)
 	lookupQuery.Set("limit", "1")
 
-	lookupBody, lookupErr := client.Get(ctx, spacesPath, lookupQuery, ops.OpConfluenceSpaceDescribe)
+	lookupBody, lookupErr := client.Get(ctx, spacesPath, lookupQuery)
 	if lookupErr != nil {
 		return nil, lookupErr
 	}
 
 	lookupResponse, decodeErr := decodeResultsPage(
 		lookupBody,
-		ops.OpConfluenceSpaceDescribe,
 		"invalid Confluence space lookup response JSON",
 	)
 	if decodeErr != nil {
@@ -266,7 +251,6 @@ func GetSpaceByKey(
 		return nil, atlaserr.New(
 			atlaserr.CodeNotFound,
 			"space not found",
-			ops.OpConfluenceSpaceDescribe,
 			false,
 			details,
 		)
@@ -277,7 +261,6 @@ func GetSpaceByKey(
 		return nil, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"space lookup result missing valid id",
-			ops.OpConfluenceSpaceDescribe,
 			false,
 			nil,
 		)
@@ -287,7 +270,6 @@ func GetSpaceByKey(
 		ctx,
 		spacesGetPathPrefix+url.PathEscape(spaceID),
 		nil,
-		ops.OpConfluenceSpaceDescribe,
 	)
 	if getErr != nil {
 		return nil, getErr
@@ -304,15 +286,15 @@ func ListPageComments(
 	emit func(item json.RawMessage) error,
 ) error {
 	if request.PageID == "" {
-		return atlaserr.InvalidArgument("missing page ID", ops.OpConfluencePageComments)
+		return atlaserr.InvalidArgument("missing page ID")
 	}
 
 	if request.Limit < 0 {
-		return atlaserr.InvalidArgument("--limit must be >= 0", ops.OpConfluencePageComments)
+		return atlaserr.InvalidArgument("--limit must be >= 0")
 	}
 
 	if request.PageSize <= 0 {
-		return atlaserr.InvalidArgument("--page-size must be > 0", ops.OpConfluencePageComments)
+		return atlaserr.InvalidArgument("--page-size must be > 0")
 	}
 
 	if request.Limit == 0 {
@@ -328,7 +310,6 @@ func ListPageComments(
 			ctx,
 			client,
 			nextURL,
-			ops.OpConfluencePageComments,
 			"invalid Confluence page comments response JSON",
 		)
 		if pageErr != nil {
@@ -363,22 +344,22 @@ func ListPageComments(
 
 func validateSearchRequest(request SearchPagesRequest) error {
 	if request.CQL == "" {
-		return atlaserr.InvalidArgument("missing required --cql", ops.OpConfluencePageSearch)
+		return atlaserr.InvalidArgument("missing required --cql")
 	}
 
 	if request.Limit < 0 {
-		return atlaserr.InvalidArgument("--limit must be >= 0", ops.OpConfluencePageSearch)
+		return atlaserr.InvalidArgument("--limit must be >= 0")
 	}
 
 	if request.PageSize <= 0 {
-		return atlaserr.InvalidArgument("--page-size must be > 0", ops.OpConfluencePageSearch)
+		return atlaserr.InvalidArgument("--page-size must be > 0")
 	}
 
 	return nil
 }
 
 func getSearchPage(ctx context.Context, client *atlassian.Client, requestURL string) (pageSearchResponse, error) {
-	body, err := client.GetURL(ctx, requestURL, ops.OpConfluencePageSearch)
+	body, err := client.GetURL(ctx, requestURL)
 	if err != nil {
 		return pageSearchResponse{}, err
 	}
@@ -416,7 +397,7 @@ func maybeStripBody(page json.RawMessage, stripBody bool) (json.RawMessage, erro
 		return page, nil
 	}
 
-	return removeBody(page, ops.OpConfluencePageSearch)
+	return removeBody(page)
 }
 
 func buildInitialSearchURL(request SearchPagesRequest) string {
@@ -486,24 +467,22 @@ func getResultsPage(
 	ctx context.Context,
 	client *atlassian.Client,
 	requestURL string,
-	op string,
 	invalidResponseMessage string,
 ) (pageSearchResponse, error) {
-	body, err := client.GetURL(ctx, requestURL, op)
+	body, err := client.GetURL(ctx, requestURL)
 	if err != nil {
 		return pageSearchResponse{}, err
 	}
 
-	return decodeResultsPage(body, op, invalidResponseMessage)
+	return decodeResultsPage(body, invalidResponseMessage)
 }
 
-func decodeResultsPage(body []byte, op string, invalidResponseMessage string) (pageSearchResponse, error) {
+func decodeResultsPage(body []byte, invalidResponseMessage string) (pageSearchResponse, error) {
 	response := pageSearchResponse{}
 	if err := json.Unmarshal(body, &response); err != nil {
 		return pageSearchResponse{}, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			invalidResponseMessage,
-			op,
 			false,
 			nil,
 		)
@@ -606,7 +585,6 @@ func emitChildrenForParent(
 			ctx,
 			client,
 			nextURL,
-			ops.OpConfluencePageComments,
 			"invalid Confluence comment children response JSON",
 		)
 		if pageErr != nil {
@@ -651,7 +629,6 @@ func emitUniqueComment(
 		return "", remaining, false, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"comment result missing valid id",
-			ops.OpConfluencePageComments,
 			false,
 			nil,
 		)
@@ -712,13 +689,12 @@ func buildQuery(options SearchOptions) url.Values {
 	return query
 }
 
-func removeBody(page json.RawMessage, op string) (json.RawMessage, error) {
+func removeBody(page json.RawMessage) (json.RawMessage, error) {
 	fields := map[string]json.RawMessage{}
 	if err := json.Unmarshal(page, &fields); err != nil {
 		return nil, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Confluence page JSON",
-			op,
 			false,
 			nil,
 		)
@@ -731,7 +707,6 @@ func removeBody(page json.RawMessage, op string) (json.RawMessage, error) {
 		return nil, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"marshal Confluence page JSON",
-			op,
 			false,
 			nil,
 		)
@@ -741,5 +716,5 @@ func removeBody(page json.RawMessage, op string) (json.RawMessage, error) {
 }
 
 func decodeSearchResponse(body []byte) (pageSearchResponse, error) {
-	return decodeResultsPage(body, ops.OpConfluencePageSearch, "invalid Confluence search response JSON")
+	return decodeResultsPage(body, "invalid Confluence search response JSON")
 }

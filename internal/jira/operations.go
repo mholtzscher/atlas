@@ -11,7 +11,6 @@ import (
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	"github.com/mholtzscher/atlas/internal/atlassian"
-	"github.com/mholtzscher/atlas/internal/ops"
 )
 
 const (
@@ -77,11 +76,11 @@ func GetIssue(
 	request GetIssueRequest,
 ) (json.RawMessage, error) {
 	if request.IssueKey == "" {
-		return nil, atlaserr.InvalidArgument("missing issue key", ops.OpJiraIssueDescribe)
+		return nil, atlaserr.InvalidArgument("missing issue key")
 	}
 
 	query := buildIssueQuery(request.Fields, request.Expand, request.Raw)
-	body, err := client.Get(ctx, issueGetPathPrefix+url.PathEscape(request.IssueKey), query, ops.OpJiraIssueDescribe)
+	body, err := client.Get(ctx, issueGetPathPrefix+url.PathEscape(request.IssueKey), query)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +115,7 @@ func SearchIssues(
 			query.Set("nextPageToken", nextPageToken)
 		}
 
-		body, err := client.Get(ctx, issueSearchPath, query, ops.OpJiraIssueSearch)
+		body, err := client.Get(ctx, issueSearchPath, query)
 		if err != nil {
 			return err
 		}
@@ -148,15 +147,15 @@ func SearchIssues(
 
 func validateSearchRequest(request SearchIssuesRequest) error {
 	if request.JQL == "" {
-		return atlaserr.InvalidArgument("missing required --jql", ops.OpJiraIssueSearch)
+		return atlaserr.InvalidArgument("missing required --jql")
 	}
 
 	if request.Limit < 0 {
-		return atlaserr.InvalidArgument("--limit must be >= 0", ops.OpJiraIssueSearch)
+		return atlaserr.InvalidArgument("--limit must be >= 0")
 	}
 
 	if request.PageSize <= 0 {
-		return atlaserr.InvalidArgument("--page-size must be > 0", ops.OpJiraIssueSearch)
+		return atlaserr.InvalidArgument("--page-size must be > 0")
 	}
 
 	return nil
@@ -237,7 +236,6 @@ func decodeSearchResponse(body []byte) (issueSearchResponse, error) {
 		return issueSearchResponse{}, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Jira search response JSON",
-			ops.OpJiraIssueSearch,
 			false,
 			nil,
 		)
@@ -266,7 +264,7 @@ func ListProjects(
 	query := url.Values{}
 	query.Set("maxResults", "1000")
 
-	body, err := client.Get(ctx, projectSearchPath, query, ops.OpJiraProjectList)
+	body, err := client.Get(ctx, projectSearchPath, query)
 	if err != nil {
 		return err
 	}
@@ -278,7 +276,6 @@ func ListProjects(
 		return atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Jira project list response JSON",
-			ops.OpJiraProjectList,
 			false,
 			nil,
 		)
@@ -306,14 +303,14 @@ func GetIssueComments(
 	emit func(item json.RawMessage) error,
 ) error {
 	if request.IssueKey == "" {
-		return atlaserr.InvalidArgument("missing issue key", ops.OpJiraIssueComments)
+		return atlaserr.InvalidArgument("missing issue key")
 	}
 
 	path := issueCommentsPath + url.PathEscape(request.IssueKey) + "/comment"
 	query := url.Values{}
 	query.Set("maxResults", "1000")
 
-	body, err := client.Get(ctx, path, query, ops.OpJiraIssueComments)
+	body, err := client.Get(ctx, path, query)
 	if err != nil {
 		return err
 	}
@@ -325,7 +322,6 @@ func GetIssueComments(
 		return atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Jira issue comments response JSON",
-			ops.OpJiraIssueComments,
 			false,
 			nil,
 		)
@@ -350,7 +346,7 @@ func ListIssueTypes(
 	_ ListIssueTypesRequest,
 	emit func(item json.RawMessage) error,
 ) error {
-	body, err := client.Get(ctx, issueTypesPath, nil, ops.OpJiraIssueTypes)
+	body, err := client.Get(ctx, issueTypesPath, nil)
 	if err != nil {
 		return err
 	}
@@ -360,7 +356,6 @@ func ListIssueTypes(
 		return atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"invalid Jira issue types response JSON",
-			ops.OpJiraIssueTypes,
 			false,
 			nil,
 		)
@@ -384,7 +379,7 @@ func GetMyself(
 	client *atlassian.Client,
 	_ GetMyselfRequest,
 ) (json.RawMessage, error) {
-	body, err := client.Get(ctx, myselfPath, nil, ops.OpJiraMyself)
+	body, err := client.Get(ctx, myselfPath, nil)
 	if err != nil {
 		return nil, err
 	}
