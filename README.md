@@ -31,12 +31,32 @@ nix build
 # Show help
 atlas --help
 
-# Run example command
-atlas example
+# List machine-readable operation IDs
+atlas meta ops
 
-# Run with verbose output
-atlas --verbose example
+# Search Jira (JSONL by default)
+atlas jira issue search --jql 'project = ABC ORDER BY updated DESC'
+
+# Use global defaults from config file
+atlas --config atlas.json jira issue search --jql 'project = ABC'
 ```
+
+Config file format is JSON and uses global flag names as keys:
+
+```json
+{
+  "output": "jsonl",
+  "site": "https://acme.atlassian.net",
+  "auth": "pat",
+  "email": "agent@example.com",
+  "api-token": "<token>",
+  "timeout": "30s",
+  "verbose": false,
+  "no-color": false
+}
+```
+
+Precedence is `flags > env > config`.
 
 ## Development
 

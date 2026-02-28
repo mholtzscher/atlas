@@ -1,23 +1,34 @@
-# Test {{ cookiecutter.project_slug }} help
-exec {{ cookiecutter.project_slug }} --help
-stdout 'Usage:'
-stdout '{{ cookiecutter.project_slug }}'
+# Test help output is text
+exec atlas --help
+stdout 'USAGE:'
+stdout 'atlas'
 ! stderr .
 
---
-# Test {{ cookiecutter.project_slug }} version
-exec {{ cookiecutter.project_slug }} --version
+# Test version output is text
+exec atlas --version
 stdout '0.1.0'
 ! stderr .
 
---
-# Test example command
-exec {{ cookiecutter.project_slug }} example
-stdout 'Hello, World!'
+# Test meta ops jsonl records
+exec atlas meta ops
+stdout '"op":"jira.issue.get"'
+stdout '"op":"jira.issue.search"'
+stdout '"op":"confluence.page.get"'
+stdout '"op":"confluence.page.search"'
 ! stderr .
 
---
-# Test example command with custom message
-exec {{ cookiecutter.project_slug }} example --message 'Custom message'
-stdout 'Custom message'
-! stderr .
+# Test missing auth/site emits text error (pre-command errors use text format)
+! exec atlas jira issue search --jql 'project=ABC'
+! stdout .
+stderr 'INVALID_ARGUMENT'
+stderr 'jira.issue.search'
+
+# Test flag can set output to text
+exec atlas --output text meta ops
+stdout '^jira.issue.get$'
+stdout '^confluence.page.search$'
+! stdout '"op":"jira.issue.get"'
+
+# Test flag can set output back to jsonl
+exec atlas --output jsonl meta ops
+stdout '"op":"jira.issue.get"'

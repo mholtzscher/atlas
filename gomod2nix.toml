@@ -717,6 +717,10 @@ schema = 3
     version = 'v0.2.0'
     hash = 'sha256-m56XF350CsHgKsbCTQ0Q1Joz2/a+S4+fnkMCx2upJ4Q='
 
+  [mod.'github.com/urfave/cli-altsrc/v3']
+    version = 'v3.1.0'
+    hash = 'sha256-Us+saDd/xo9LraXOX5TNKvMc1xBt65ByrZmFxgM3JXo='
+
   [mod.'github.com/urfave/cli/v3']
     version = 'v3.6.2'
     hash = 'sha256-GeTwfmXv2okvX2kmMREozvH4PH6ihPNVFSNSWrW+gyQ='
