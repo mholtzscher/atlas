@@ -3,14 +3,17 @@ package ops
 
 // Stable operation IDs.
 const (
-	OpJiraIssueGet         = "jira.issue.get"
-	OpJiraIssueSearch      = "jira.issue.search"
-	OpJiraProjectList      = "jira.project.list"
-	OpJiraIssueComments    = "jira.issue.comments"
-	OpJiraIssueTypes       = "jira.issue.types"
-	OpJiraMyself           = "jira.myself"
-	OpConfluencePageGet    = "confluence.page.get"
-	OpConfluencePageSearch = "confluence.page.search"
+	OpJiraIssueGet           = "jira.issue.get"
+	OpJiraIssueSearch        = "jira.issue.search"
+	OpJiraProjectList        = "jira.project.list"
+	OpJiraIssueComments      = "jira.issue.comments"
+	OpJiraIssueTypes         = "jira.issue.types"
+	OpJiraMyself             = "jira.myself"
+	OpConfluenceSpaceList    = "confluence.space.list"
+	OpConfluenceSpaceGet     = "confluence.space.get"
+	OpConfluencePageComments = "confluence.page.comments"
+	OpConfluencePageGet      = "confluence.page.get"
+	OpConfluencePageSearch   = "confluence.page.search"
 )
 
 // Definition describes one operation for allowlisting.
@@ -29,6 +32,13 @@ type Args struct {
 
 // All returns all machine-visible operations.
 func All() []Definition {
+	definitions := jiraDefinitions()
+	definitions = append(definitions, confluenceDefinitions()...)
+
+	return definitions
+}
+
+func jiraDefinitions() []Definition {
 	return []Definition{
 		{
 			Op:      OpJiraIssueGet,
@@ -81,6 +91,46 @@ func All() []Definition {
 			Mutates: false,
 			Auth:    []string{"pat", "oauth"},
 			Args:    Args{},
+		},
+	}
+}
+
+func confluenceDefinitions() []Definition {
+	return []Definition{
+		{
+			Op:      OpConfluenceSpaceList,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args: Args{
+				Positional: []string{},
+				Flags: []string{
+					"limit",
+					"page-size",
+					"cursor",
+				},
+			},
+		},
+		{
+			Op:      OpConfluenceSpaceGet,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args: Args{
+				Positional: []string{"spaceKey"},
+			},
+		},
+		{
+			Op:      OpConfluencePageComments,
+			Mutates: false,
+			Auth:    []string{"pat", "oauth"},
+			Args: Args{
+				Positional: []string{"pageID"},
+				Flags: []string{
+					"limit",
+					"page-size",
+					"cursor",
+					"body-format",
+				},
+			},
 		},
 		{
 			Op:      OpConfluencePageGet,
