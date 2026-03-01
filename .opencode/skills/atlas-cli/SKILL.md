@@ -38,6 +38,8 @@ atlas jira issue types
 atlas jira myself
 ```
 
+**Note:** Jira search is not semantic - see [jira.md](./references/jira.md) for search strategy (try related terms, synonyms, summary vs text searches).
+
 Confluence:
 
 ```bash
@@ -48,6 +50,8 @@ atlas confluence page view 12345678 --format markdown
 atlas confluence page search --cql "space = DEV AND title ~ 'architecture'" --limit 10
 atlas confluence page comments 12345678
 ```
+
+**Note:** Confluence search is not semantic - see [confluence.md](./references/confluence.md) for search strategy (try related terms, synonyms, title vs text searches).
 
 ## In This Reference
 
