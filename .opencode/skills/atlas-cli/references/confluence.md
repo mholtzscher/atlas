@@ -56,17 +56,17 @@ The HTML output is pretty-printed. Markdown conversion uses `html-to-markdown`.
 
 ## page search
 
-Search pages using CQL. `--cql` is required.
+Search pages using CQL. `--query` is required.
 
 ```bash
-atlas confluence page search --cql "space = DEV AND title ~ 'architecture'"
-atlas confluence page search --cql "label = 'runbook'" --limit 10
-atlas confluence page search --cql "type = page AND lastModified > now('-7d')" --include-labels
+atlas confluence page search --query "space = DEV AND title ~ 'architecture'"
+atlas confluence page search --query "label = 'runbook'" --limit 10
+atlas confluence page search --query "type = page AND lastModified > now('-7d')" --include-labels
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--cql` | string | - | CQL query (required) |
+| `--query` | string | - | CQL query (required) |
 | `--include-labels` | bool | `false` | Include page labels |
 | `--include-properties` | bool | `false` | Include page properties |
 | `--include-operations` | bool | `false` | Include permitted operations |
@@ -100,13 +100,15 @@ Confluence CQL is not a semantic search engine. It does not automatically match 
 
 **Example dynamic search for "economics":**
 ```bash
-# Search various related terms separately
-atlas confluence page search --cql "text ~ 'economics'"
-atlas confluence page search --cql "title ~ 'economics'"
-atlas confluence page search --cql "text ~ 'pricing'"
-atlas confluence page search --cql "text ~ 'cost'"
-atlas confluence page search --cql "text ~ 'revenue'"
-atlas confluence page search --cql "label = 'economics'"
+# Search multiple related terms in a single query
+atlas confluence page search --query "text ~ 'economics' OR text ~ 'pricing' OR text ~ 'cost' OR text ~ 'revenue' OR title ~ 'economics' OR label = 'economics'"
+```
+
+For more granular control over field matching, search terms can also be run separately:
+```bash
+atlas confluence page search --query "text ~ 'economics'"      # body text
+atlas confluence page search --query "title ~ 'economics'"    # title only
+atlas confluence page search --query "label = 'economics'"    # exact label match
 ```
 
 ## page comments
