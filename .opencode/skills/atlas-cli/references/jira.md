@@ -52,6 +52,8 @@ atlas jira issue search --query "sprint in openSprints()" --fields sprint,labels
 | `--expand` | string slice | - | Jira expand parameters |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `50` | Max total results |
+| `--page-size` | int | `50` | Results per API request |
+| `--page-token` | string | - | Resume from specific position |
 
 ### Common JQL patterns
 

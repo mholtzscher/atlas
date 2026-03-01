@@ -111,11 +111,22 @@ atlas confluence page view 123456789
 
 ### Pagination
 
-Atlas automatically paginates through API results and streams them as newline-delimited JSONL items. Pagination is transparent—no manual handling required.
+Atlas automatically paginates through API results and streams them as newline-delimited JSONL items.
 
-For advanced use cases (debugging or resuming interrupted operations), hidden flags are available:
+For paginated list/search operations (`jira issue search`, `confluence space list`, `confluence page search`), a pagination metadata record is emitted after all data records when more results are available:
+
+```json
+{"pagination":{"hasMore":true,"nextCursor":"abc123","returned":50}}
+```
+
+This enables programmatic pagination for consumers of the CLI output. When `hasMore` is false, the pagination record is omitted.
+
+**Pagination flags:**
+- `--limit`: Max total results to emit (default varies by command)
 - `--page-size`: Tune results per API request (performance/rate-limit tuning)
 - `--cursor` / `--page-token`: Resume from a specific pagination position
+
+**Note:** `confluence page comments` returns all comments without pagination support.
 
 ## Development
 

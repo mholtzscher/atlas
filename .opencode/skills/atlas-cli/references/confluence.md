@@ -12,6 +12,8 @@ atlas confluence space list --limit 100
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--limit` | int | `25` | Max total results |
+| `--page-size` | int | `25` | Results per API request |
+| `--cursor` | string | - | Resume from specific position |
 | `--raw` | bool | `false` | Full payload |
 
 ## space describe
@@ -73,6 +75,8 @@ atlas confluence page search --query "type = page AND lastModified > now('-7d')"
 | `--include-versions` | bool | `false` | Include version history |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `25` | Max total results |
+| `--page-size` | int | `25` | Results per API request |
+| `--cursor` | string | - | Resume from specific position |
 
 ### Common CQL patterns
 
@@ -113,14 +117,13 @@ atlas confluence page search --query "label = 'economics'"    # exact label matc
 
 ## page comments
 
-Get footer comments on a page. Performs DFS traversal of comment threads (fetches replies recursively). Comments include the body content as plain text.
+Get footer comments on a page. Performs DFS traversal of comment threads (fetches replies recursively). Returns **all comments** - pagination is not supported for this command. Comments include the body content as plain text.
 
 ```bash
 atlas confluence page comments 12345678
-atlas confluence page comments 12345678 --limit 100
+atlas confluence page comments 12345678 --raw
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--raw` | bool | `false` | Full payload |
-| `--limit` | int | `25` | Max total comments (including thread replies) |
