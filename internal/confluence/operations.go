@@ -18,7 +18,7 @@ import (
 
 const (
 	pageGetPathPrefix              = "/wiki/api/v2/pages/"
-	pageSearchPath                 = "/wiki/api/v2/content/search"
+	pageSearchPath                 = "/wiki/rest/api/content/search"
 	spacesPath                     = "/wiki/api/v2/spaces"
 	spacesGetPathPrefix            = "/wiki/api/v2/spaces/"
 	pageFooterCommentsPathTemplate = "/wiki/api/v2/pages/%s/footer-comments"

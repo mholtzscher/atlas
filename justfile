@@ -14,8 +14,9 @@ build-release:
     go build -ldflags="-s -w"
 
 # Run the binary with arguments (use `just -- run <args>` for flags)
+[positional-arguments]
 run *ARGS:
-    go run . {{ARGS}}
+    go run . "$@"
 
 # Run all tests
 test:
@@ -79,5 +80,6 @@ cruft-update:
     cruft update
 
 # Run with nix
+[positional-arguments]
 nix-run *ARGS:
-    nix run -- {{ARGS}}
+    nix run -- "$@"
