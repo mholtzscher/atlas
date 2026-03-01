@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/mholtzscher/atlas/compare/v0.1.1...v0.2.0) (2026-03-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* The --no-color global flag has been removed. Users previously relying on this flag to disable colored output will need to update their scripts and configurations.
+* **confluence:** CLI flag interface changed. Users must migrate from:   --include-labels --include-properties to:   --include labels --include properties or use --include all to enable all fields.
+* **cli:** --jql and --cql flags removed, use --query instead
+
+### Features
+
+* **cli:** consolidate confluence include flags into single --include flag ([8186ecf](https://github.com/mholtzscher/atlas/commit/8186ecfb6c7edd67fb92fc57e93a173a946d59a2))
+* **cli:** unify search flags to --query ([#11](https://github.com/mholtzscher/atlas/issues/11)) ([d6e4854](https://github.com/mholtzscher/atlas/commit/d6e48545a048fa732313bd412edaff6eaeb650f4))
+* **operations:** add pagination metadata support to list operations ([#13](https://github.com/mholtzscher/atlas/issues/13)) ([4d0b8bf](https://github.com/mholtzscher/atlas/commit/4d0b8bf5a18d908a8d20b0c6bf36a80e41924669))
+* remove --no-color flag and related options ([e1a1a07](https://github.com/mholtzscher/atlas/commit/e1a1a07025f58d0524f865eeafa0e21904fe9ccc))
+
+
+### Code Refactoring
+
+* **confluence:** consolidate include flags into single --include option ([b4e97c0](https://github.com/mholtzscher/atlas/commit/b4e97c05290edee4f68954cd03d5a489b3ed3a5d))
+
 ## [0.1.1](https://github.com/mholtzscher/atlas/compare/v0.1.0...v0.1.1) (2026-03-01)
 
 
