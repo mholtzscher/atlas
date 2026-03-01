@@ -49,8 +49,6 @@ atlas confluence page search --cql "space = DEV AND title ~ 'architecture'" --li
 atlas confluence page comments 12345678
 ```
 
-If the user doesn't provide JQL/CQL and you can't infer it safely, ask for the query.
-
 ## In This Reference
 
 | File | Purpose |
