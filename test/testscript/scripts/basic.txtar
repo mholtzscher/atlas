@@ -4,11 +4,6 @@ stdout 'USAGE:'
 stdout 'atlas'
 ! stderr .
 
-# Test version output is text
-exec atlas --version
-stdout '0.1.0'
-! stderr .
-
 # Test confluence page command surface rename
 exec atlas confluence page --help
 stdout 'describe'

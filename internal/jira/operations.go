@@ -35,6 +35,10 @@ type issueSearchResponse struct {
 	NextPageToken string            `json:"nextPageToken"`
 }
 
+type projectSearchResponse struct {
+	Values []json.RawMessage `json:"values"`
+}
+
 // GetIssueRequest defines Jira issue get inputs.
 type GetIssueRequest struct {
 	IssueKey string
@@ -171,11 +175,9 @@ func emitIssues(issues []json.RawMessage, remaining int, emit func(item json.Raw
 
 func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
 	query := url.Values{}
+	query.Set("fieldsByKeys", "true")
 
-	effectiveFields := fields
-	if !raw && len(effectiveFields) == 0 {
-		effectiveFields = DefaultFields()
-	}
+	effectiveFields := effectiveIssueFields(fields, raw)
 
 	if len(effectiveFields) > 0 {
 		query.Set("fields", strings.Join(effectiveFields, ","))
@@ -186,6 +188,34 @@ func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
 	}
 
 	return query
+}
+
+func effectiveIssueFields(fields []string, raw bool) []string {
+	if raw {
+		return []string{"*all"}
+	}
+
+	effectiveFields := append([]string{}, DefaultFields()...)
+	seen := make(map[string]struct{}, len(effectiveFields))
+	for _, field := range effectiveFields {
+		seen[field] = struct{}{}
+	}
+
+	for _, field := range fields {
+		trimmedField := strings.TrimSpace(field)
+		if trimmedField == "" {
+			continue
+		}
+
+		if _, exists := seen[trimmedField]; exists {
+			continue
+		}
+
+		effectiveFields = append(effectiveFields, trimmedField)
+		seen[trimmedField] = struct{}{}
+	}
+
+	return effectiveFields
 }
 
 func decodeSearchResponse(body []byte) (issueSearchResponse, error) {
@@ -446,71 +476,95 @@ func ListProjects(
 	}
 
 	remaining := request.Limit
+	isSearch := request.Query != ""
+	path := projectsPath
+	if isSearch {
+		path = projectSearchPath
+	}
 
 	for remaining > 0 {
 		pageSize := min(remaining, request.PageSize)
-
-		query := url.Values{}
-		if request.Query != "" {
-			query.Set("query", request.Query)
-		}
-		query.Set("maxResults", strconv.Itoa(pageSize))
-
-		if len(request.Expand) > 0 {
-			query.Set("expand", strings.Join(request.Expand, ","))
-		}
-
-		path := projectsPath
-		if request.Query != "" {
-			path = projectSearchPath
-		}
+		query := buildProjectsQuery(request, pageSize)
 
 		body, err := client.Get(ctx, path, query)
 		if err != nil {
 			return err
 		}
 
-		var projects []json.RawMessage
-		if request.Query != "" {
-			var response struct {
-				Values []json.RawMessage `json:"values"`
-			}
-			if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
-				return atlaserr.New(
-					atlaserr.CodeUpstreamError,
-					"invalid Jira project search response JSON",
-					false,
-					nil,
-				)
-			}
-			projects = response.Values
-		} else {
-			if unmarshalErr := json.Unmarshal(body, &projects); unmarshalErr != nil {
-				return atlaserr.New(
-					atlaserr.CodeUpstreamError,
-					"invalid Jira projects response JSON",
-					false,
-					nil,
-				)
-			}
+		projects, decodeErr := decodeProjectsResponse(body, isSearch)
+		if decodeErr != nil {
+			return decodeErr
 		}
 
-		for _, project := range projects {
-			if remaining <= 0 {
-				return nil
-			}
-
-			if emitErr := emit(project); emitErr != nil {
-				return fmt.Errorf("emit project: %w", emitErr)
-			}
-
-			remaining--
+		var emitErr error
+		remaining, emitErr = emitProjects(projects, remaining, emit)
+		if emitErr != nil {
+			return emitErr
 		}
 
-		if len(projects) < pageSize {
+		if remaining == 0 || len(projects) < pageSize {
 			return nil
 		}
 	}
 
 	return nil
+}
+
+func buildProjectsQuery(request ListProjectsRequest, pageSize int) url.Values {
+	query := url.Values{}
+	if request.Query != "" {
+		query.Set("query", request.Query)
+	}
+
+	query.Set("maxResults", strconv.Itoa(pageSize))
+
+	if len(request.Expand) > 0 {
+		query.Set("expand", strings.Join(request.Expand, ","))
+	}
+
+	return query
+}
+
+func decodeProjectsResponse(body []byte, isSearch bool) ([]json.RawMessage, error) {
+	if isSearch {
+		var response projectSearchResponse
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, atlaserr.New(
+				atlaserr.CodeUpstreamError,
+				"invalid Jira project search response JSON",
+				false,
+				nil,
+			)
+		}
+
+		return response.Values, nil
+	}
+
+	var projects []json.RawMessage
+	if err := json.Unmarshal(body, &projects); err != nil {
+		return nil, atlaserr.New(
+			atlaserr.CodeUpstreamError,
+			"invalid Jira projects response JSON",
+			false,
+			nil,
+		)
+	}
+
+	return projects, nil
+}
+
+func emitProjects(projects []json.RawMessage, remaining int, emit func(item json.RawMessage) error) (int, error) {
+	for _, project := range projects {
+		if remaining <= 0 {
+			return 0, nil
+		}
+
+		if err := emit(project); err != nil {
+			return remaining, fmt.Errorf("emit project: %w", err)
+		}
+
+		remaining--
+	}
+
+	return remaining, nil
 }
