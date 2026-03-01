@@ -11,7 +11,7 @@ stdout 'view'
 ! stdout 'get'
 
 # Test missing auth/site emits text error (pre-command errors use text format)
-! exec atlas jira issue search --jql 'project=ABC'
+! exec atlas jira issue search --query 'project=ABC'
 ! stdout .
 stderr 'INVALID_ARGUMENT'
 stderr 'jira.issue.search'
