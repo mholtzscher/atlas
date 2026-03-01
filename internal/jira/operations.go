@@ -11,6 +11,7 @@ import (
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	"github.com/mholtzscher/atlas/internal/atlassian"
+	"github.com/mholtzscher/atlas/internal/output"
 )
 
 const (
@@ -98,17 +99,19 @@ func SearchIssues(
 	client *atlassian.Client,
 	request SearchIssuesRequest,
 	emit func(item json.RawMessage) error,
-) error {
+) (*output.Pagination, error) {
 	if validateErr := validateSearchRequest(request); validateErr != nil {
-		return validateErr
+		return nil, validateErr
 	}
 
 	if request.Limit <= 0 {
-		return nil
+		return nil, nil //nolint:nilnil // nil pagination means no pagination info needed
 	}
 
 	remaining := request.Limit
 	nextPageToken := request.PageToken
+	returnedCount := 0
+	var lastNextPageToken string
 
 	for remaining > 0 {
 		pageSize := min(remaining, request.PageSize)
@@ -121,32 +124,57 @@ func SearchIssues(
 
 		body, err := client.Get(ctx, issueSearchPath, query)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		response, decodeErr := decodeSearchResponse(body)
 		if decodeErr != nil {
-			return decodeErr
+			return nil, decodeErr
 		}
 
 		var emitErr error
-		remaining, emitErr = emitIssues(response.Issues, remaining, emit)
+		remaining, returnedCount, emitErr = emitIssues(
+			response.Issues,
+			remaining,
+			returnedCount,
+			emit,
+		)
 		if emitErr != nil {
-			return emitErr
+			return nil, emitErr
 		}
 
 		if remaining == 0 {
-			return nil
+			// Reached limit - check if there are more results
+			if response.NextPageToken != "" {
+				return &output.Pagination{
+					HasMore:    true,
+					NextCursor: response.NextPageToken,
+					Returned:   returnedCount,
+				}, nil
+			}
+			// No more results available
+			return nil, nil //nolint:nilnil // nil pagination means no more data
 		}
 
 		if response.NextPageToken == "" {
-			return nil
+			// No more pages available
+			return nil, nil //nolint:nilnil // nil pagination means no pagination info needed
 		}
 
+		lastNextPageToken = response.NextPageToken
 		nextPageToken = response.NextPageToken
 	}
 
-	return nil
+	// Exceeded limit but there might be more results
+	if lastNextPageToken != "" {
+		return &output.Pagination{
+			HasMore:    true,
+			NextCursor: lastNextPageToken,
+			Returned:   returnedCount,
+		}, nil
+	}
+
+	return nil, nil //nolint:nilnil // nil pagination means no pagination info needed
 }
 
 func validateSearchRequest(request SearchIssuesRequest) error {
@@ -157,20 +185,26 @@ func validateSearchRequest(request SearchIssuesRequest) error {
 	return nil
 }
 
-func emitIssues(issues []json.RawMessage, remaining int, emit func(item json.RawMessage) error) (int, error) {
+func emitIssues(
+	issues []json.RawMessage,
+	remaining int,
+	returnedCount int,
+	emit func(item json.RawMessage) error,
+) (int, int, error) {
 	for _, issue := range issues {
 		if remaining <= 0 {
-			return 0, nil
+			return 0, returnedCount, nil
 		}
 
 		if emitErr := emit(issue); emitErr != nil {
-			return remaining, fmt.Errorf("emit issue: %w", emitErr)
+			return remaining, returnedCount, fmt.Errorf("emit issue: %w", emitErr)
 		}
 
 		remaining--
+		returnedCount++
 	}
 
-	return remaining, nil
+	return remaining, returnedCount, nil
 }
 
 func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
@@ -553,7 +587,11 @@ func decodeProjectsResponse(body []byte, isSearch bool) ([]json.RawMessage, erro
 	return projects, nil
 }
 
-func emitProjects(projects []json.RawMessage, remaining int, emit func(item json.RawMessage) error) (int, error) {
+func emitProjects(
+	projects []json.RawMessage,
+	remaining int,
+	emit func(item json.RawMessage) error,
+) (int, error) {
 	for _, project := range projects {
 		if remaining <= 0 {
 			return 0, nil

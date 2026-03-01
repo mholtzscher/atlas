@@ -132,8 +132,8 @@ func newIssueSearchCommand() *ufcli.Command {
 			&ufcli.StringSliceFlag{Name: flagExpand, Usage: "Expand fields"},
 			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
 			&ufcli.IntFlag{Name: flagLimit, Value: defaultLimit, Usage: "Max issues to emit"},
-			&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request", Hidden: true},
-			&ufcli.StringFlag{Name: flagPageToken, Usage: "Initial page token", Hidden: true},
+			&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request"},
+			&ufcli.StringFlag{Name: flagPageToken, Usage: "Page token for pagination"},
 		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, true)
@@ -141,7 +141,7 @@ func newIssueSearchCommand() *ufcli.Command {
 				return err
 			}
 
-			return jiraops.SearchIssues(ctx, deps.Client, jiraops.SearchIssuesRequest{
+			pagination, searchErr := jiraops.SearchIssues(ctx, deps.Client, jiraops.SearchIssuesRequest{
 				JQL:       cmd.String(flagQuery),
 				Fields:    cmd.StringSlice(flagFields),
 				Expand:    cmd.StringSlice(flagExpand),
@@ -161,6 +161,11 @@ func newIssueSearchCommand() *ufcli.Command {
 
 				return deps.Emitter.EmitRecord(issue)
 			})
+			if searchErr != nil {
+				return searchErr
+			}
+
+			return deps.Emitter.EmitPagination(pagination)
 		},
 	}
 }

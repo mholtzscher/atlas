@@ -18,47 +18,57 @@ func TestListSpacesFollowsPagination(t *testing.T) {
 	t.Parallel()
 
 	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		requestCount++
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			requestCount++
 
-		if request.URL.Path != "/wiki/api/v2/spaces" {
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
-
-		switch request.URL.Query().Get("cursor") {
-		case "":
-			if request.URL.Query().Get("limit") != "1" {
-				t.Fatalf("expected initial limit=1, got %q", request.URL.Query().Get("limit"))
+			if request.URL.Path != "/wiki/api/v2/spaces" {
+				t.Fatalf("unexpected path: %s", request.URL.Path)
 			}
 
-			writeJSON(writer, `{"results":[{"id":"100"}],"_links":{"next":"/wiki/api/v2/spaces?cursor=next&limit=1"}}`)
-		case "next":
-			writeJSON(writer, `{"results":[{"id":"200"}],"_links":{"next":""}}`)
-		default:
-			t.Fatalf("unexpected cursor: %q", request.URL.Query().Get("cursor"))
-		}
-	}))
+			switch request.URL.Query().Get("cursor") {
+			case "":
+				if request.URL.Query().Get("limit") != "1" {
+					t.Fatalf("expected initial limit=1, got %q", request.URL.Query().Get("limit"))
+				}
+
+				writeJSON(
+					writer,
+					`{"results":[{"id":"100"}],"_links":{"next":"/wiki/api/v2/spaces?cursor=next&limit=1"}}`,
+				)
+			case "next":
+				writeJSON(writer, `{"results":[{"id":"200"}],"_links":{"next":""}}`)
+			default:
+				t.Fatalf("unexpected cursor: %q", request.URL.Query().Get("cursor"))
+			}
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
 	ids := make([]string, 0, 2)
 
-	err := confluenceops.ListSpaces(context.Background(), client, confluenceops.ListSpacesRequest{
-		Limit:    2,
-		PageSize: 1,
-	}, func(item json.RawMessage) error {
-		var payload struct {
-			ID string `json:"id"`
-		}
+	pagination, err := confluenceops.ListSpaces(
+		context.Background(),
+		client,
+		confluenceops.ListSpacesRequest{
+			Limit:    2,
+			PageSize: 1,
+		},
+		func(item json.RawMessage) error {
+			var payload struct {
+				ID string `json:"id"`
+			}
 
-		idErr := json.Unmarshal(item, &payload)
-		if idErr != nil {
-			return idErr
-		}
+			idErr := json.Unmarshal(item, &payload)
+			if idErr != nil {
+				return idErr
+			}
 
-		ids = append(ids, payload.ID)
-		return nil
-	})
+			ids = append(ids, payload.ID)
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("ListSpaces returned error: %v", err)
 	}
@@ -70,22 +80,28 @@ func TestListSpacesFollowsPagination(t *testing.T) {
 	if !reflect.DeepEqual(ids, []string{"100", "200"}) {
 		t.Fatalf("unexpected ids: %#v", ids)
 	}
+
+	if pagination != nil {
+		t.Fatalf("expected nil pagination when no more results, got %+v", pagination)
+	}
 }
 
 func TestGetSpaceByKeyNotFound(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/wiki/api/v2/spaces" {
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/wiki/api/v2/spaces" {
+				t.Fatalf("unexpected path: %s", request.URL.Path)
+			}
 
-		if request.URL.Query().Get("keys") != "DEV" {
-			t.Fatalf("expected keys=DEV, got %q", request.URL.Query().Get("keys"))
-		}
+			if request.URL.Query().Get("keys") != "DEV" {
+				t.Fatalf("expected keys=DEV, got %q", request.URL.Query().Get("keys"))
+			}
 
-		writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
-	}))
+			writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
@@ -113,56 +129,63 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 	t.Parallel()
 
 	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		requestCount++
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			requestCount++
 
-		switch request.URL.Path {
-		case "/wiki/api/v2/pages/123/footer-comments":
-			if request.URL.Query().Get("limit") != "2" {
-				t.Fatalf("expected limit=2, got %q", request.URL.Query().Get("limit"))
-			}
+			switch request.URL.Path {
+			case "/wiki/api/v2/pages/123/footer-comments":
+				if request.URL.Query().Get("limit") != "2" {
+					t.Fatalf("expected limit=2, got %q", request.URL.Query().Get("limit"))
+				}
 
-			writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
-		case "/wiki/api/v2/footer-comments/c1/children":
-			switch request.URL.Query().Get("cursor") {
-			case "":
-				writeJSON(
-					writer,
-					`{"results":[{"id":"c1a"}],`+
-						`"_links":{"next":"/wiki/api/v2/footer-comments/c1/children?cursor=next&limit=2"}}`,
-				)
-			case "next":
-				writeJSON(writer, `{"results":[{"id":"c1b"}],"_links":{"next":""}}`)
+				writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
+			case "/wiki/api/v2/footer-comments/c1/children":
+				switch request.URL.Query().Get("cursor") {
+				case "":
+					writeJSON(
+						writer,
+						`{"results":[{"id":"c1a"}],`+
+							`"_links":{"next":"/wiki/api/v2/footer-comments/c1/children?cursor=next&limit=2"}}`,
+					)
+				case "next":
+					writeJSON(writer, `{"results":[{"id":"c1b"}],"_links":{"next":""}}`)
+				default:
+					t.Fatalf("unexpected cursor: %q", request.URL.Query().Get("cursor"))
+				}
 			default:
-				t.Fatalf("unexpected cursor: %q", request.URL.Query().Get("cursor"))
+				t.Fatalf("unexpected path: %s", request.URL.Path)
 			}
-		default:
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
-	}))
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
 	emittedIDs := make([]string, 0, 3)
 
-	err := confluenceops.ListPageComments(context.Background(), client, confluenceops.ListPageCommentsRequest{
-		PageID:     "123",
-		Limit:      3,
-		PageSize:   2,
-		BodyFormat: confluenceops.BodyFormatView,
-	}, func(item json.RawMessage) error {
-		var payload struct {
-			ID string `json:"id"`
-		}
+	pagination, err := confluenceops.ListPageComments(
+		context.Background(),
+		client,
+		confluenceops.ListPageCommentsRequest{
+			PageID:     "123",
+			Limit:      3,
+			PageSize:   2,
+			BodyFormat: confluenceops.BodyFormatView,
+		},
+		func(item json.RawMessage) error {
+			var payload struct {
+				ID string `json:"id"`
+			}
 
-		idErr := json.Unmarshal(item, &payload)
-		if idErr != nil {
-			return idErr
-		}
+			idErr := json.Unmarshal(item, &payload)
+			if idErr != nil {
+				return idErr
+			}
 
-		emittedIDs = append(emittedIDs, payload.ID)
-		return nil
-	})
+			emittedIDs = append(emittedIDs, payload.ID)
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("ListPageComments returned error: %v", err)
 	}
@@ -174,70 +197,98 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 	if requestCount != 3 {
 		t.Fatalf("expected 3 requests, got %d", requestCount)
 	}
+
+	if pagination != nil {
+		t.Fatalf(
+			"expected nil pagination when limit reached but no more top-level comments, got %+v",
+			pagination,
+		)
+	}
 }
 
 func TestSearchPagesRawDoesNotIncludeBodyFormat(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/wiki/rest/api/content/search" {
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
-
-		query := request.URL.Query()
-		if got := query.Get("body-format"); got != "" {
-			t.Fatalf("expected no body-format, got %q", got)
-		}
-
-		for _, key := range []string{"include-labels", "include-properties", "include-operations", "include-versions"} {
-			if got := query.Get(key); got != "true" {
-				t.Fatalf("expected %s=true, got %q", key, got)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/wiki/rest/api/content/search" {
+				t.Fatalf("unexpected path: %s", request.URL.Path)
 			}
-		}
 
-		writeJSON(writer, `{"results":[{"id":"123"}],"_links":{"next":""}}`)
-	}))
+			query := request.URL.Query()
+			if got := query.Get("body-format"); got != "" {
+				t.Fatalf("expected no body-format, got %q", got)
+			}
+
+			for _, key := range []string{"include-labels", "include-properties", "include-operations", "include-versions"} {
+				if got := query.Get(key); got != "true" {
+					t.Fatalf("expected %s=true, got %q", key, got)
+				}
+			}
+
+			writeJSON(writer, `{"results":[{"id":"123"}],"_links":{"next":""}}`)
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
 
-	err := confluenceops.SearchPages(context.Background(), client, confluenceops.SearchPagesRequest{
-		CQL:      "type=page",
-		Limit:    1,
-		PageSize: 1,
-		SearchOptions: confluenceops.SearchOptions{
-			Raw: true,
+	pagination, err := confluenceops.SearchPages(
+		context.Background(),
+		client,
+		confluenceops.SearchPagesRequest{
+			CQL:      "type=page",
+			Limit:    1,
+			PageSize: 1,
+			SearchOptions: confluenceops.SearchOptions{
+				Raw: true,
+			},
 		},
-	}, func(_ json.RawMessage) error {
-		return nil
-	})
+		func(_ json.RawMessage) error {
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("SearchPages returned error: %v", err)
+	}
+
+	if pagination != nil {
+		t.Fatalf("expected nil pagination when no more results, got %+v", pagination)
 	}
 }
 
 func TestSearchPagesStripsBodyWhenNotRaw(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writeJSON(writer, `{"results":[{"id":"123","body":{"view":{"value":"<p>hi</p>"}}}],"_links":{"next":""}}`)
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writeJSON(
+				writer,
+				`{"results":[{"id":"123","body":{"view":{"value":"<p>hi</p>"}}}],"_links":{"next":""}}`,
+			)
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
 
 	var page json.RawMessage
-	err := confluenceops.SearchPages(context.Background(), client, confluenceops.SearchPagesRequest{
-		CQL:      "type=page",
-		Limit:    1,
-		PageSize: 1,
-		SearchOptions: confluenceops.SearchOptions{
-			Raw: false,
+	pagination, err := confluenceops.SearchPages(
+		context.Background(),
+		client,
+		confluenceops.SearchPagesRequest{
+			CQL:      "type=page",
+			Limit:    1,
+			PageSize: 1,
+			SearchOptions: confluenceops.SearchOptions{
+				Raw: false,
+			},
 		},
-	}, func(item json.RawMessage) error {
-		page = item
-		return nil
-	})
+		func(item json.RawMessage) error {
+			page = item
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("SearchPages returned error: %v", err)
 	}
@@ -250,37 +301,48 @@ func TestSearchPagesStripsBodyWhenNotRaw(t *testing.T) {
 	if _, exists := payload["body"]; exists {
 		t.Fatal("expected body to be stripped when not raw")
 	}
+
+	if pagination != nil {
+		t.Fatalf("expected nil pagination when no more results, got %+v", pagination)
+	}
 }
 
 func TestListPageCommentsHonorsLimit(t *testing.T) {
 	t.Parallel()
 
 	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		requestCount++
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			requestCount++
 
-		switch request.URL.Path {
-		case "/wiki/api/v2/pages/123/footer-comments":
-			writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
-		default:
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
-	}))
+			switch request.URL.Path {
+			case "/wiki/api/v2/pages/123/footer-comments":
+				writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
+			default:
+				t.Fatalf("unexpected path: %s", request.URL.Path)
+			}
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
 	emitted := 0
 
-	err := confluenceops.ListPageComments(context.Background(), client, confluenceops.ListPageCommentsRequest{
-		PageID:     "123",
-		Limit:      1,
-		PageSize:   1,
-		BodyFormat: confluenceops.BodyFormatNone,
-		Raw:        true,
-	}, func(_ json.RawMessage) error {
-		emitted++
-		return nil
-	})
+	pagination, err := confluenceops.ListPageComments(
+		context.Background(),
+		client,
+		confluenceops.ListPageCommentsRequest{
+			PageID:     "123",
+			Limit:      1,
+			PageSize:   1,
+			BodyFormat: confluenceops.BodyFormatNone,
+			Raw:        true,
+		},
+		func(_ json.RawMessage) error {
+			emitted++
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("ListPageComments returned error: %v", err)
 	}
@@ -288,22 +350,31 @@ func TestListPageCommentsHonorsLimit(t *testing.T) {
 	if emitted != 1 {
 		t.Fatalf("expected 1 emitted comment, got %d", emitted)
 	}
+
+	if pagination != nil {
+		t.Fatalf(
+			"expected nil pagination when limit reached but no more comments, got %+v",
+			pagination,
+		)
+	}
 }
 
 func TestGetPageRawKeepsBody(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/wiki/api/v2/pages/123" {
-			t.Fatalf("unexpected path: %s", request.URL.Path)
-		}
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/wiki/api/v2/pages/123" {
+				t.Fatalf("unexpected path: %s", request.URL.Path)
+			}
 
-		if got := request.URL.Query().Get("body-format"); got != confluenceops.BodyFormatView {
-			t.Fatalf("expected body-format=view, got %q", got)
-		}
+			if got := request.URL.Query().Get("body-format"); got != confluenceops.BodyFormatView {
+				t.Fatalf("expected body-format=view, got %q", got)
+			}
 
-		writeJSON(writer, `{"id":"123","body":{"view":{"value":"<p>hello</p>"}}}`)
-	}))
+			writeJSON(writer, `{"id":"123","body":{"view":{"value":"<p>hello</p>"}}}`)
+		}),
+	)
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)

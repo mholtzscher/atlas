@@ -81,19 +81,32 @@ func newSpaceListCommand() *ufcli.Command {
 				return err
 			}
 
-			return confluenceops.ListSpaces(ctx, deps.Client, confluenceops.ListSpacesRequest{
-				Limit:    cmd.Int(flagLimit),
-				PageSize: cmd.Int(flagPageSize),
-				Cursor:   cmd.String(flagCursor),
-			}, func(space json.RawMessage) error {
-				compactSpace, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), space)
-				if compactErr != nil {
-					return compactErr
-				}
+			pagination, listErr := confluenceops.ListSpaces(
+				ctx,
+				deps.Client,
+				confluenceops.ListSpacesRequest{
+					Limit:    cmd.Int(flagLimit),
+					PageSize: cmd.Int(flagPageSize),
+					Cursor:   cmd.String(flagCursor),
+				},
+				func(space json.RawMessage) error {
+					compactSpace, compactErr := maybeCompactConfluenceRecord(
+						cmd.Bool(flagRaw),
+						space,
+					)
+					if compactErr != nil {
+						return compactErr
+					}
 
-				space = compactSpace
-				return deps.Emitter.EmitRecord(space)
-			})
+					space = compactSpace
+					return deps.Emitter.EmitRecord(space)
+				},
+			)
+			if listErr != nil {
+				return listErr
+			}
+
+			return deps.Emitter.EmitPagination(pagination)
 		},
 	}
 }
@@ -103,7 +116,9 @@ func newSpaceDescribeCommand() *ufcli.Command {
 		Name:      "describe",
 		Usage:     "Describe space by key",
 		ArgsUsage: "<SPACE_KEY>",
-		Flags:     []ufcli.Flag{&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"}},
+		Flags: []ufcli.Flag{
+			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"},
+		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, true)
 			if err != nil {
@@ -114,9 +129,13 @@ func newSpaceDescribeCommand() *ufcli.Command {
 				return errors.New("expected exactly one argument: <SPACE_KEY>")
 			}
 
-			space, describeErr := confluenceops.GetSpaceByKey(ctx, deps.Client, confluenceops.GetSpaceByKeyRequest{
-				SpaceKey: cmd.Args().First(),
-			})
+			space, describeErr := confluenceops.GetSpaceByKey(
+				ctx,
+				deps.Client,
+				confluenceops.GetSpaceByKeyRequest{
+					SpaceKey: cmd.Args().First(),
+				},
+			)
 			if describeErr != nil {
 				return describeErr
 			}
@@ -249,21 +268,31 @@ func newPageSearchCommand() *ufcli.Command {
 				return err
 			}
 
-			return confluenceops.SearchPages(ctx, deps.Client, confluenceops.SearchPagesRequest{
-				CQL:           cmd.String(flagQuery),
-				Limit:         cmd.Int(flagLimit),
-				PageSize:      cmd.Int(flagPageSize),
-				Cursor:        cmd.String(flagCursor),
-				SearchOptions: buildSearchOptions(cmd),
-			}, func(page json.RawMessage) error {
-				compactPage, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), page)
-				if compactErr != nil {
-					return compactErr
-				}
+			pagination, searchErr := confluenceops.SearchPages(
+				ctx,
+				deps.Client,
+				confluenceops.SearchPagesRequest{
+					CQL:           cmd.String(flagQuery),
+					Limit:         cmd.Int(flagLimit),
+					PageSize:      cmd.Int(flagPageSize),
+					Cursor:        cmd.String(flagCursor),
+					SearchOptions: buildSearchOptions(cmd),
+				},
+				func(page json.RawMessage) error {
+					compactPage, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), page)
+					if compactErr != nil {
+						return compactErr
+					}
 
-				page = compactPage
-				return deps.Emitter.EmitRecord(page)
-			})
+					page = compactPage
+					return deps.Emitter.EmitRecord(page)
+				},
+			)
+			if searchErr != nil {
+				return searchErr
+			}
+
+			return deps.Emitter.EmitPagination(pagination)
 		},
 	}
 }
@@ -287,22 +316,35 @@ func newPageCommentsCommand() *ufcli.Command {
 				return errors.New("expected exactly one argument: <PAGE_ID>")
 			}
 
-			return confluenceops.ListPageComments(ctx, deps.Client, confluenceops.ListPageCommentsRequest{
-				PageID:     cmd.Args().First(),
-				Limit:      cmd.Int(flagLimit),
-				PageSize:   cmd.Int(flagPageSize),
-				Cursor:     cmd.String(flagCursor),
-				BodyFormat: confluenceops.BodyFormatStorage,
-				Raw:        cmd.Bool(flagRaw),
-			}, func(comment json.RawMessage) error {
-				compactComment, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), comment)
-				if compactErr != nil {
-					return compactErr
-				}
+			pagination, listErr := confluenceops.ListPageComments(
+				ctx,
+				deps.Client,
+				confluenceops.ListPageCommentsRequest{
+					PageID:     cmd.Args().First(),
+					Limit:      cmd.Int(flagLimit),
+					PageSize:   cmd.Int(flagPageSize),
+					Cursor:     cmd.String(flagCursor),
+					BodyFormat: confluenceops.BodyFormatStorage,
+					Raw:        cmd.Bool(flagRaw),
+				},
+				func(comment json.RawMessage) error {
+					compactComment, compactErr := maybeCompactConfluenceRecord(
+						cmd.Bool(flagRaw),
+						comment,
+					)
+					if compactErr != nil {
+						return compactErr
+					}
 
-				comment = compactComment
-				return deps.Emitter.EmitRecord(comment)
-			})
+					comment = compactComment
+					return deps.Emitter.EmitRecord(comment)
+				},
+			)
+			if listErr != nil {
+				return listErr
+			}
+
+			return deps.Emitter.EmitPagination(pagination)
 		},
 	}
 }
@@ -335,8 +377,12 @@ func commentsFlags() []ufcli.Flag {
 func paginationFlags(limitUsage string) []ufcli.Flag {
 	return []ufcli.Flag{
 		&ufcli.IntFlag{Name: flagLimit, Value: defaultLimit, Usage: limitUsage},
-		&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request", Hidden: true},
-		&ufcli.StringFlag{Name: flagCursor, Usage: "Initial cursor", Hidden: true},
+		&ufcli.IntFlag{
+			Name:  flagPageSize,
+			Value: defaultPageSize,
+			Usage: "Max results per request",
+		},
+		&ufcli.StringFlag{Name: flagCursor, Usage: "Cursor for pagination"},
 	}
 }
 
