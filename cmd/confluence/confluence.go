@@ -14,16 +14,12 @@ import (
 )
 
 const (
-	flagBodyFormat        = "body-format"
-	flagIncludeLabels     = "include-labels"
-	flagIncludeProperties = "include-properties"
-	flagIncludeOperations = "include-operations"
-	flagIncludeVersions   = "include-versions"
-	flagQuery             = "query"
-	flagLimit             = "limit"
-	flagPageSize          = "page-size"
-	flagCursor            = "cursor"
-	flagRaw               = "raw"
+	flagInclude  = "include"
+	flagQuery    = "query"
+	flagLimit    = "limit"
+	flagPageSize = "page-size"
+	flagCursor   = "cursor"
+	flagRaw      = "raw"
 )
 
 const (
@@ -340,19 +336,19 @@ func newPageCommentsCommand() *ufcli.Command {
 
 func pageDescribeFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
-		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
-		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
-		&ufcli.BoolFlag{Name: flagIncludeVersions, Usage: "Include versions"},
+		&ufcli.StringSliceFlag{
+			Name:  flagInclude,
+			Usage: "Fields to include (labels, properties, operations, versions, or all)",
+		},
 	}
 }
 
 func pageSearchFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
-		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
-		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
-		&ufcli.BoolFlag{Name: flagIncludeVersions, Usage: "Include versions"},
+		&ufcli.StringSliceFlag{
+			Name:  flagInclude,
+			Usage: "Fields to include (labels, properties, operations, versions, or all)",
+		},
 		&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"},
 	}
 }
@@ -376,24 +372,45 @@ func paginationFlags(limitUsage string) []ufcli.Flag {
 }
 
 func buildSearchOptions(cmd *ufcli.Command) confluenceops.SearchOptions {
-	return confluenceops.SearchOptions{
-		BodyFormat:        confluenceops.BodyFormatNone,
-		IncludeLabels:     cmd.Bool(flagIncludeLabels),
-		IncludeProperties: cmd.Bool(flagIncludeProperties),
-		IncludeOperations: cmd.Bool(flagIncludeOperations),
-		IncludeVersions:   cmd.Bool(flagIncludeVersions),
-		Raw:               cmd.Bool(flagRaw),
-	}
+	includeValues := cmd.StringSlice(flagInclude)
+	return parseIncludeFlags(includeValues, cmd.Bool(flagRaw))
 }
 
 func buildPageDescribeOptions(cmd *ufcli.Command) confluenceops.SearchOptions {
-	return confluenceops.SearchOptions{
-		BodyFormat:        confluenceops.BodyFormatNone,
-		IncludeLabels:     cmd.Bool(flagIncludeLabels),
-		IncludeProperties: cmd.Bool(flagIncludeProperties),
-		IncludeOperations: cmd.Bool(flagIncludeOperations),
-		IncludeVersions:   cmd.Bool(flagIncludeVersions),
+	includeValues := cmd.StringSlice(flagInclude)
+	return parseIncludeFlags(includeValues, false)
+}
+
+func parseIncludeFlags(includeValues []string, raw bool) confluenceops.SearchOptions {
+	opts := confluenceops.SearchOptions{
+		BodyFormat: confluenceops.BodyFormatNone,
+		Raw:        raw,
 	}
+
+	hasAll := false
+	for _, v := range includeValues {
+		switch v {
+		case "all":
+			hasAll = true
+		case "labels":
+			opts.IncludeLabels = true
+		case "properties":
+			opts.IncludeProperties = true
+		case "operations":
+			opts.IncludeOperations = true
+		case "versions":
+			opts.IncludeVersions = true
+		}
+	}
+
+	if hasAll || raw {
+		opts.IncludeLabels = true
+		opts.IncludeProperties = true
+		opts.IncludeOperations = true
+		opts.IncludeVersions = true
+	}
+
+	return opts
 }
 
 func maybeCompactConfluenceRecord(raw bool, record json.RawMessage) (json.RawMessage, error) {
