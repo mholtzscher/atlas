@@ -23,7 +23,7 @@ Atlas provides programmatic access to Atlassian Cloud APIs with output formats o
 - **Page describe**: Get page metadata by ID
 - **Page view**: Display page body content (formatted HTML)
 - **Page search**: Search pages with CQL
-- **Page comments**: Get footer comments on a page
+- **Page comments**: Get footer comments with plain text body content
 
 ### Output Formats
 
@@ -112,9 +112,13 @@ atlas confluence page view 123456789
 | `auth` | `pat` | Authentication mode (pat or oauth) |
 | `timeout` | `30s` | HTTP request timeout |
 
-**Pagination Defaults:**
-- Jira issue search: 50 results per page, 50 max results
-- Confluence space/page search: 25 results per page, 25 max results
+### Pagination
+
+Atlas automatically paginates through API results and streams them as newline-delimited JSONL items. Pagination is transparent—no manual handling required.
+
+For advanced use cases (debugging or resuming interrupted operations), hidden flags are available:
+- `--page-size`: Tune results per API request (performance/rate-limit tuning)
+- `--cursor` / `--page-token`: Resume from a specific pagination position
 
 ## Development
 

@@ -42,7 +42,7 @@ Search issues using JQL. `--jql` is required.
 ```bash
 atlas jira issue search --jql "project = PROJ AND status = 'In Progress'"
 atlas jira issue search --jql "assignee = currentUser() ORDER BY updated DESC" --limit 10
-atlas jira issue search --jql "sprint in openSprints()" --fields sprint,labels --page-size 25
+atlas jira issue search --jql "sprint in openSprints()" --fields sprint,labels
 ```
 
 | Flag | Type | Default | Description |
@@ -52,8 +52,6 @@ atlas jira issue search --jql "sprint in openSprints()" --fields sprint,labels -
 | `--expand` | string slice | - | Jira expand parameters |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `50` | Max total results |
-| `--page-size` | int | `50` | Results per API request |
-| `--page-token` | string | - | Resume from pagination token |
 
 ### Common JQL patterns
 

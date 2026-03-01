@@ -132,8 +132,8 @@ func newIssueSearchCommand() *ufcli.Command {
 			&ufcli.StringSliceFlag{Name: flagExpand, Usage: "Expand fields"},
 			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
 			&ufcli.IntFlag{Name: flagLimit, Value: defaultLimit, Usage: "Max issues to emit"},
-			&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request"},
-			&ufcli.StringFlag{Name: flagPageToken, Usage: "Initial page token"},
+			&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request", Hidden: true},
+			&ufcli.StringFlag{Name: flagPageToken, Usage: "Initial page token", Hidden: true},
 		},
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, true)

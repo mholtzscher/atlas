@@ -288,7 +288,7 @@ func newPageCommentsCommand() *ufcli.Command {
 				Limit:      cmd.Int(flagLimit),
 				PageSize:   cmd.Int(flagPageSize),
 				Cursor:     cmd.String(flagCursor),
-				BodyFormat: cmd.String(flagBodyFormat),
+				BodyFormat: confluenceops.BodyFormatStorage,
 				Raw:        cmd.Bool(flagRaw),
 			}, func(comment json.RawMessage) error {
 				compactComment, compactErr := maybeCompactConfluenceRecord(cmd.Bool(flagRaw), comment)
@@ -314,11 +314,6 @@ func pageDescribeFlags() []ufcli.Flag {
 
 func pageSearchFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.StringFlag{
-			Name:  flagBodyFormat,
-			Value: confluenceops.BodyFormatNone,
-			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
-		},
 		&ufcli.BoolFlag{Name: flagIncludeLabels, Usage: "Include labels"},
 		&ufcli.BoolFlag{Name: flagIncludeProperties, Usage: "Include properties"},
 		&ufcli.BoolFlag{Name: flagIncludeOperations, Usage: "Include operations"},
@@ -329,11 +324,6 @@ func pageSearchFlags() []ufcli.Flag {
 
 func commentsFlags() []ufcli.Flag {
 	return []ufcli.Flag{
-		&ufcli.StringFlag{
-			Name:  flagBodyFormat,
-			Value: confluenceops.BodyFormatNone,
-			Usage: "Body format (none, storage, editor, export_view, view, atlas_doc_format)",
-		},
 		&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Confluence payload"},
 	}
 }
@@ -341,14 +331,14 @@ func commentsFlags() []ufcli.Flag {
 func paginationFlags(limitUsage string) []ufcli.Flag {
 	return []ufcli.Flag{
 		&ufcli.IntFlag{Name: flagLimit, Value: defaultLimit, Usage: limitUsage},
-		&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request"},
-		&ufcli.StringFlag{Name: flagCursor, Usage: "Initial cursor"},
+		&ufcli.IntFlag{Name: flagPageSize, Value: defaultPageSize, Usage: "Max results per request", Hidden: true},
+		&ufcli.StringFlag{Name: flagCursor, Usage: "Initial cursor", Hidden: true},
 	}
 }
 
 func buildSearchOptions(cmd *ufcli.Command) confluenceops.SearchOptions {
 	return confluenceops.SearchOptions{
-		BodyFormat:        cmd.String(flagBodyFormat),
+		BodyFormat:        confluenceops.BodyFormatNone,
 		IncludeLabels:     cmd.Bool(flagIncludeLabels),
 		IncludeProperties: cmd.Bool(flagIncludeProperties),
 		IncludeOperations: cmd.Bool(flagIncludeOperations),

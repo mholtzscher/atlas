@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
+
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 
 	"github.com/mholtzscher/atlas/internal/atlaserr"
 	"github.com/mholtzscher/atlas/internal/atlassian"
@@ -137,7 +140,7 @@ func SearchPages(
 
 	remaining := request.Limit
 	nextURL := buildInitialSearchURL(request)
-	stripBody := request.BodyFormat == BodyFormatNone && !request.Raw
+	stripBody := !request.Raw
 
 	for remaining > 0 && nextURL != "" {
 		response, pageErr := getSearchPage(ctx, client, nextURL)
@@ -401,7 +404,7 @@ func maybeStripBody(page json.RawMessage, stripBody bool) (json.RawMessage, erro
 }
 
 func buildInitialSearchURL(request SearchPagesRequest) string {
-	query := buildQuery(request.SearchOptions)
+	query := buildSearchQuery(request.SearchOptions)
 	query.Set("cql", request.CQL)
 	query.Set("limit", strconv.Itoa(min(request.Limit, request.PageSize)))
 	if request.Cursor != "" {
@@ -638,8 +641,15 @@ func emitUniqueComment(
 		return commentID, remaining, false, nil
 	}
 
+	// Simplify comment body before emitting
+	simplifiedComment, simplifyErr := simplifyCommentBody(comment)
+	if simplifyErr != nil {
+		// If simplification fails, use original comment
+		simplifiedComment = comment
+	}
+
 	visitedCommentIDs[commentID] = struct{}{}
-	if emitErr := emit(comment); emitErr != nil {
+	if emitErr := emit(simplifiedComment); emitErr != nil {
 		return "", remaining, false, fmt.Errorf("emit comment: %w", emitErr)
 	}
 
@@ -689,6 +699,28 @@ func buildQuery(options SearchOptions) url.Values {
 	return query
 }
 
+func buildSearchQuery(options SearchOptions) url.Values {
+	query := url.Values{}
+
+	if options.IncludeLabels || options.Raw {
+		query.Set("include-labels", strconv.FormatBool(true))
+	}
+
+	if options.IncludeProperties || options.Raw {
+		query.Set("include-properties", strconv.FormatBool(true))
+	}
+
+	if options.IncludeOperations || options.Raw {
+		query.Set("include-operations", strconv.FormatBool(true))
+	}
+
+	if options.IncludeVersions || options.Raw {
+		query.Set("include-versions", strconv.FormatBool(true))
+	}
+
+	return query
+}
+
 func removeBody(page json.RawMessage) (json.RawMessage, error) {
 	fields := map[string]json.RawMessage{}
 	if err := json.Unmarshal(page, &fields); err != nil {
@@ -717,4 +749,167 @@ func removeBody(page json.RawMessage) (json.RawMessage, error) {
 
 func decodeSearchResponse(body []byte) (pageSearchResponse, error) {
 	return decodeResultsPage(body, "invalid Confluence search response JSON")
+}
+
+// simplifyCommentBody extracts the body content from nested structure and converts HTML to Markdown.
+// Input: {"body":{"storage":{"representation":"storage","value":"<p>text</p>"}},...}
+// Output: {"body":"text",...}.
+func simplifyCommentBody(comment json.RawMessage) (json.RawMessage, error) {
+	var data map[string]any
+	if err := json.Unmarshal(comment, &data); err != nil {
+		return nil, fmt.Errorf("parse comment: %w", err)
+	}
+
+	body, hasBody := data["body"]
+	if !hasBody {
+		return comment, nil
+	}
+
+	bodyObj, isMap := body.(map[string]any)
+	if !isMap {
+		return comment, nil
+	}
+
+	// Try to extract content from storage format.
+	plainText := extractPlainTextFromStorage(bodyObj)
+	if plainText == "" {
+		// Try to extract from atlas_doc_format.
+		plainText = extractPlainTextFromADF(bodyObj)
+	}
+
+	if plainText != "" {
+		data["body"] = plainText
+		return json.Marshal(data)
+	}
+
+	return comment, nil
+}
+
+// extractPlainTextFromStorage extracts plain text from storage format body.
+func extractPlainTextFromStorage(bodyObj map[string]any) string {
+	storage, hasStorage := bodyObj["storage"]
+	if !hasStorage {
+		return ""
+	}
+
+	storageObj, isMap := storage.(map[string]any)
+	if !isMap {
+		return ""
+	}
+
+	value, hasValue := storageObj["value"]
+	if !hasValue {
+		return ""
+	}
+
+	strValue, isString := value.(string)
+	if !isString || strValue == "" {
+		return ""
+	}
+
+	return stripHTMLTags(strValue)
+}
+
+// extractPlainTextFromADF extracts plain text from ADF format body.
+func extractPlainTextFromADF(bodyObj map[string]any) string {
+	adf, hasAdf := bodyObj["atlas_doc_format"]
+	if !hasAdf {
+		return ""
+	}
+
+	adfObj, isMap := adf.(map[string]any)
+	if !isMap {
+		return ""
+	}
+
+	value, hasValue := adfObj["value"]
+	if !hasValue {
+		return ""
+	}
+
+	strValue, isString := value.(string)
+	if !isString || strValue == "" {
+		return ""
+	}
+
+	return extractTextFromADFJSON(strValue)
+}
+
+// stripHTMLTags removes HTML tags and decodes entities.
+func stripHTMLTags(html string) string {
+	markdown, err := htmltomarkdown.ConvertString(html)
+	if err != nil {
+		return simpleStripTags(html)
+	}
+	return cleanMarkdown(markdown)
+}
+
+// simpleStripTags is a fallback HTML tag stripper.
+func simpleStripTags(html string) string {
+	inTag := false
+	var result []rune
+	for _, r := range html {
+		switch r {
+		case '<':
+			inTag = true
+		case '>':
+			inTag = false
+		default:
+			if !inTag {
+				result = append(result, r)
+			}
+		}
+	}
+	return string(result)
+}
+
+// cleanMarkdown removes markdown formatting for plain text output.
+func cleanMarkdown(md string) string {
+	replacements := []struct {
+		old string
+		new string
+	}{
+		{"**", ""},
+		{"__", ""},
+		{"*", ""},
+		{"_", ""},
+		{"`", ""},
+		{"## ", ""},
+		{"# ", ""},
+		{"> ", ""},
+		{"- ", ""},
+		{"* ", ""},
+	}
+	result := md
+	for _, r := range replacements {
+		result = strings.ReplaceAll(result, r.old, r.new)
+	}
+	return strings.TrimSpace(result)
+}
+
+// extractTextFromADFJSON extracts plain text from Atlas Document Format JSON.
+func extractTextFromADFJSON(adfJSON string) string {
+	var adf struct {
+		Content []struct {
+			Type    string `json:"type"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(adfJSON), &adf); err != nil {
+		return adfJSON
+	}
+
+	var texts []string
+	for _, node := range adf.Content {
+		for _, child := range node.Content {
+			if child.Text != "" {
+				texts = append(texts, child.Text)
+			}
+		}
+	}
+
+	return strings.Join(texts, " ")
 }

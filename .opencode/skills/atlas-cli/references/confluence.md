@@ -6,14 +6,12 @@ List accessible Confluence spaces.
 
 ```bash
 atlas confluence space list
-atlas confluence space list --limit 100 --page-size 50
+atlas confluence space list --limit 100
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--limit` | int | `25` | Max total results |
-| `--page-size` | int | `25` | Results per API request |
-| `--cursor` | string | - | Resume from pagination cursor |
 | `--raw` | bool | `false` | Full payload |
 
 ## space describe
@@ -62,22 +60,19 @@ Search pages using CQL. `--cql` is required.
 
 ```bash
 atlas confluence page search --cql "space = DEV AND title ~ 'architecture'"
-atlas confluence page search --cql "label = 'runbook'" --body-format view --limit 10
+atlas confluence page search --cql "label = 'runbook'" --limit 10
 atlas confluence page search --cql "type = page AND lastModified > now('-7d')" --include-labels
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--cql` | string | - | CQL query (required) |
-| `--body-format` | string | `none` | Body format: `none`, `storage`, `editor`, `export_view`, `view`, `atlas_doc_format` |
 | `--include-labels` | bool | `false` | Include page labels |
 | `--include-properties` | bool | `false` | Include page properties |
 | `--include-operations` | bool | `false` | Include permitted operations |
 | `--include-versions` | bool | `false` | Include version history |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `25` | Max total results |
-| `--page-size` | int | `25` | Results per API request |
-| `--cursor` | string | - | Resume from pagination cursor |
 
 ### Common CQL patterns
 
@@ -93,7 +88,7 @@ text ~ "search term"                         # full-text search
 
 ## page comments
 
-Get footer comments on a page. Performs DFS traversal of comment threads (fetches replies recursively).
+Get footer comments on a page. Performs DFS traversal of comment threads (fetches replies recursively). Comments include the body content as plain text.
 
 ```bash
 atlas confluence page comments 12345678
@@ -102,8 +97,5 @@ atlas confluence page comments 12345678 --limit 100
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--body-format` | string | `none` | Comment body format |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `25` | Max total comments (including thread replies) |
-| `--page-size` | int | `25` | Comments per API request |
-| `--cursor` | string | - | Resume from pagination cursor |

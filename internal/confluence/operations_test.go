@@ -176,7 +176,7 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 	}
 }
 
-func TestSearchPagesRawForcesFullQuery(t *testing.T) {
+func TestSearchPagesRawDoesNotIncludeBodyFormat(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -185,8 +185,8 @@ func TestSearchPagesRawForcesFullQuery(t *testing.T) {
 		}
 
 		query := request.URL.Query()
-		if got := query.Get("body-format"); got != confluenceops.BodyFormatView {
-			t.Fatalf("expected body-format=view, got %q", got)
+		if got := query.Get("body-format"); got != "" {
+			t.Fatalf("expected no body-format, got %q", got)
 		}
 
 		for _, key := range []string{"include-labels", "include-properties", "include-operations", "include-versions"} {
@@ -216,7 +216,7 @@ func TestSearchPagesRawForcesFullQuery(t *testing.T) {
 	}
 }
 
-func TestSearchPagesStripsBodyWhenNoneFormatAndNotRaw(t *testing.T) {
+func TestSearchPagesStripsBodyWhenNotRaw(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
@@ -232,8 +232,7 @@ func TestSearchPagesStripsBodyWhenNoneFormatAndNotRaw(t *testing.T) {
 		Limit:    1,
 		PageSize: 1,
 		SearchOptions: confluenceops.SearchOptions{
-			BodyFormat: confluenceops.BodyFormatNone,
-			Raw:        false,
+			Raw: false,
 		},
 	}, func(item json.RawMessage) error {
 		page = item
@@ -249,7 +248,7 @@ func TestSearchPagesStripsBodyWhenNoneFormatAndNotRaw(t *testing.T) {
 	}
 
 	if _, exists := payload["body"]; exists {
-		t.Fatal("expected body to be stripped for BodyFormatNone when not raw")
+		t.Fatal("expected body to be stripped when not raw")
 	}
 }
 

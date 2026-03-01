@@ -36,10 +36,6 @@ func TestCompactRecordDropsNoisyFieldsAndCollapsesNestedObjects(t *testing.T) {
 		t.Fatalf("compact output unexpectedly contains _links")
 	}
 
-	if _, exists := decoded["body"]; exists {
-		t.Fatalf("compact output unexpectedly contains body")
-	}
-
 	assertRawValue(t, decoded, "id", `"123"`)
 	assertRawValue(t, decoded, "title", `"Page title"`)
 	assertRawValue(t, decoded, "status", `"current"`)

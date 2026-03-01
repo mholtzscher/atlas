@@ -145,7 +145,7 @@ func trimmedScalar(object map[string]json.RawMessage, key string) (json.RawMessa
 
 func shouldDropCompactKey(key string) bool {
 	switch key {
-	case "_expandable", "_links", "avatarUrls", "body", "icon", "iconUrl", "links", "self", "tinyui", "webui":
+	case "_expandable", "_links", "avatarUrls", "icon", "iconUrl", "links", "self", "tinyui", "webui":
 		return true
 	default:
 		return false
