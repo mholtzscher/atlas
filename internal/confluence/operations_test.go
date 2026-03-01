@@ -180,7 +180,7 @@ func TestSearchPagesRawDoesNotIncludeBodyFormat(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/wiki/api/v2/content/search" {
+		if request.URL.Path != "/wiki/rest/api/content/search" {
 			t.Fatalf("unexpected path: %s", request.URL.Path)
 		}
 
