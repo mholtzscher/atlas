@@ -40,6 +40,8 @@ const (
 	// BodyFormatAtlasDocFormat returns Atlas Document Format (ADF).
 	BodyFormatAtlasDocFormat = "atlas_doc_format"
 	defaultLimit             = 25
+	// defaultCommentsPageSize is the page size for fetching all comments.
+	defaultCommentsPageSize = 100
 )
 
 type pageSearchResponse struct {
@@ -91,9 +93,6 @@ type GetSpaceByKeyRequest struct {
 // ListPageCommentsRequest defines page comments inputs.
 type ListPageCommentsRequest struct {
 	PageID     string
-	Limit      int
-	PageSize   int
-	Cursor     string
 	BodyFormat string
 	Raw        bool
 }
@@ -331,38 +330,22 @@ func GetSpaceByKey(
 	return json.RawMessage(body), nil
 }
 
-// ListPageComments streams page footer comments and their threaded replies.
-//
-//nolint:gocognit // Complexity slightly exceeds threshold due to pagination tracking
+// ListPageComments streams all page footer comments and their threaded replies.
+// This function returns all comments without pagination support.
 func ListPageComments(
 	ctx context.Context,
 	client *atlassian.Client,
 	request ListPageCommentsRequest,
 	emit func(item json.RawMessage) error,
-) (*output.Pagination, error) {
+) error {
 	if request.PageID == "" {
-		return nil, atlaserr.InvalidArgument("missing page ID")
+		return atlaserr.InvalidArgument("missing page ID")
 	}
 
-	if request.Limit < 0 {
-		return nil, atlaserr.InvalidArgument("--limit must be >= 0")
-	}
-
-	if request.PageSize <= 0 {
-		return nil, atlaserr.InvalidArgument("--page-size must be > 0")
-	}
-
-	if request.Limit == 0 {
-		return nil, nil //nolint:nilnil // nil pagination means no more data
-	}
-
-	remaining := request.Limit
-	visitedCommentIDs := map[string]struct{}{}
 	nextURL := buildInitialPageCommentsURL(request)
-	returnedCount := 0
-	var lastNextURL string
+	visitedCommentIDs := map[string]struct{}{}
 
-	for remaining > 0 && nextURL != "" {
+	for nextURL != "" {
 		response, pageErr := getResultsPage(
 			ctx,
 			client,
@@ -370,53 +353,26 @@ func ListPageComments(
 			"invalid Confluence page comments response JSON",
 		)
 		if pageErr != nil {
-			return nil, pageErr
+			return pageErr
 		}
 
 		for _, comment := range response.Results {
-			var processErr error
-			remaining, processErr = emitCommentTree(
+			if processErr := emitCommentTree(
 				ctx,
 				client,
 				comment,
 				request,
-				remaining,
 				visitedCommentIDs,
 				emit,
-				&returnedCount,
-			)
-			if processErr != nil {
-				return nil, processErr
-			}
-
-			if remaining == 0 {
-				// Reached limit - check if there are more results
-				if response.Links.Next != "" {
-					return &output.Pagination{
-						HasMore:    true,
-						NextCursor: extractCursorFromURL(response.Links.Next),
-						Returned:   returnedCount,
-					}, nil
-				}
-				// No more results available
-				return nil, nil //nolint:nilnil // nil pagination means no more data
+			); processErr != nil {
+				return processErr
 			}
 		}
 
-		lastNextURL = response.Links.Next
 		nextURL = response.Links.Next
 	}
 
-	if lastNextURL != "" {
-		// There might be more results available
-		return &output.Pagination{
-			HasMore:    true,
-			NextCursor: extractCursorFromURL(lastNextURL),
-			Returned:   returnedCount,
-		}, nil
-	}
-
-	return nil, nil //nolint:nilnil // nil pagination means no more data
+	return nil
 }
 
 func validateSearchRequest(request SearchPagesRequest) error {
@@ -507,12 +463,7 @@ func buildInitialSpacesURL(request ListSpacesRequest) string {
 }
 
 func buildInitialPageCommentsURL(request ListPageCommentsRequest) string {
-	query := buildCommentsQuery(
-		request.BodyFormat,
-		request.Raw,
-		min(request.Limit, request.PageSize),
-		request.Cursor,
-	)
+	query := buildCommentsQuery(request.BodyFormat, request.Raw, defaultCommentsPageSize, "")
 	resolvedURL := url.URL{
 		Path:     fmt.Sprintf(pageFooterCommentsPathTemplate, url.PathEscape(request.PageID)),
 		RawQuery: query.Encode(),
@@ -614,54 +565,45 @@ func emitCommentTree(
 	client *atlassian.Client,
 	rootComment json.RawMessage,
 	request ListPageCommentsRequest,
-	remaining int,
 	visitedCommentIDs map[string]struct{},
 	emit func(item json.RawMessage) error,
-	returnedCount *int,
-) (int, error) {
-	rootID, nextRemaining, shouldTraverse, emitErr := emitUniqueComment(
+) error {
+	rootID, shouldTraverse, emitErr := emitUniqueComment(
 		rootComment,
-		remaining,
 		visitedCommentIDs,
 		emit,
-		returnedCount,
 	)
 	if emitErr != nil {
-		return remaining, emitErr
+		return emitErr
 	}
 
 	if !shouldTraverse {
-		return nextRemaining, nil
+		return nil
 	}
-
-	remaining = nextRemaining
 
 	stack := []string{rootID}
 
-	for remaining > 0 && len(stack) > 0 {
+	for len(stack) > 0 {
 		last := len(stack) - 1
 		parentID := stack[last]
 		stack = stack[:last]
 
-		childIDs, childRemaining, childrenErr := emitChildrenForParent(
+		childIDs, childrenErr := emitChildrenForParent(
 			ctx,
 			client,
 			parentID,
 			request,
-			remaining,
 			visitedCommentIDs,
 			emit,
-			returnedCount,
 		)
 		if childrenErr != nil {
-			return remaining, childrenErr
+			return childrenErr
 		}
 
-		remaining = childRemaining
 		stack = appendReversed(stack, childIDs)
 	}
 
-	return remaining, nil
+	return nil
 }
 
 func emitChildrenForParent(
@@ -669,15 +611,18 @@ func emitChildrenForParent(
 	client *atlassian.Client,
 	parentID string,
 	request ListPageCommentsRequest,
-	remaining int,
 	visitedCommentIDs map[string]struct{},
 	emit func(item json.RawMessage) error,
-	returnedCount *int,
-) ([]string, int, error) {
-	nextURL := buildCommentChildrenURL(parentID, request.PageSize, request.BodyFormat, request.Raw)
-	childIDs := make([]string, 0, request.PageSize)
+) ([]string, error) {
+	nextURL := buildCommentChildrenURL(
+		parentID,
+		defaultCommentsPageSize,
+		request.BodyFormat,
+		request.Raw,
+	)
+	childIDs := make([]string, 0, defaultCommentsPageSize)
 
-	for remaining > 0 && nextURL != "" {
+	for nextURL != "" {
 		response, pageErr := getResultsPage(
 			ctx,
 			client,
@@ -685,47 +630,38 @@ func emitChildrenForParent(
 			"invalid Confluence comment children response JSON",
 		)
 		if pageErr != nil {
-			return nil, remaining, pageErr
+			return nil, pageErr
 		}
 
 		for _, child := range response.Results {
-			childID, nextRemaining, shouldTraverse, emitErr := emitUniqueComment(
+			childID, shouldTraverse, emitErr := emitUniqueComment(
 				child,
-				remaining,
 				visitedCommentIDs,
 				emit,
-				returnedCount,
 			)
 			if emitErr != nil {
-				return nil, remaining, emitErr
+				return nil, emitErr
 			}
 
-			remaining = nextRemaining
 			if shouldTraverse {
 				childIDs = append(childIDs, childID)
-			}
-
-			if remaining == 0 {
-				return childIDs, 0, nil
 			}
 		}
 
 		nextURL = response.Links.Next
 	}
 
-	return childIDs, remaining, nil
+	return childIDs, nil
 }
 
 func emitUniqueComment(
 	comment json.RawMessage,
-	remaining int,
 	visitedCommentIDs map[string]struct{},
 	emit func(item json.RawMessage) error,
-	returnedCount *int,
-) (string, int, bool, error) {
+) (string, bool, error) {
 	commentID, commentIDErr := extractID(comment)
 	if commentIDErr != nil {
-		return "", remaining, false, atlaserr.New(
+		return "", false, atlaserr.New(
 			atlaserr.CodeUpstreamError,
 			"comment result missing valid id",
 			false,
@@ -734,7 +670,7 @@ func emitUniqueComment(
 	}
 
 	if _, seen := visitedCommentIDs[commentID]; seen {
-		return commentID, remaining, false, nil
+		return commentID, false, nil
 	}
 
 	// Simplify comment body before emitting
@@ -746,19 +682,10 @@ func emitUniqueComment(
 
 	visitedCommentIDs[commentID] = struct{}{}
 	if emitErr := emit(simplifiedComment); emitErr != nil {
-		return "", remaining, false, fmt.Errorf("emit comment: %w", emitErr)
+		return "", false, fmt.Errorf("emit comment: %w", emitErr)
 	}
 
-	if returnedCount != nil {
-		*returnedCount++
-	}
-
-	nextRemaining := remaining - 1
-	if nextRemaining <= 0 {
-		return commentID, 0, false, nil
-	}
-
-	return commentID, nextRemaining, true, nil
+	return commentID, true, nil
 }
 
 func appendReversed(base []string, items []string) []string {

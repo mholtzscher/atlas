@@ -125,7 +125,7 @@ func TestGetSpaceByKeyNotFound(t *testing.T) {
 	}
 }
 
-func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
+func TestListPageCommentsTraversesThreads(t *testing.T) {
 	t.Parallel()
 
 	requestCount := 0
@@ -135,24 +135,32 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 
 			switch request.URL.Path {
 			case "/wiki/api/v2/pages/123/footer-comments":
-				if request.URL.Query().Get("limit") != "2" {
-					t.Fatalf("expected limit=2, got %q", request.URL.Query().Get("limit"))
-				}
-
-				writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
+				writeJSON(
+					writer,
+					`{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`,
+				)
 			case "/wiki/api/v2/footer-comments/c1/children":
 				switch request.URL.Query().Get("cursor") {
 				case "":
 					writeJSON(
 						writer,
 						`{"results":[{"id":"c1a"}],`+
-							`"_links":{"next":"/wiki/api/v2/footer-comments/c1/children?cursor=next&limit=2"}}`,
+							`"_links":{"next":"/wiki/api/v2/footer-comments/c1/children?cursor=next&limit=100"}}`,
 					)
 				case "next":
 					writeJSON(writer, `{"results":[{"id":"c1b"}],"_links":{"next":""}}`)
 				default:
 					t.Fatalf("unexpected cursor: %q", request.URL.Query().Get("cursor"))
 				}
+			case "/wiki/api/v2/footer-comments/c1a/children":
+				// c1a has no children
+				writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
+			case "/wiki/api/v2/footer-comments/c1b/children":
+				// c1b has no children
+				writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
+			case "/wiki/api/v2/footer-comments/c2/children":
+				// c2 has no children
+				writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
 			default:
 				t.Fatalf("unexpected path: %s", request.URL.Path)
 			}
@@ -161,15 +169,13 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 	defer server.Close()
 
 	client := newTestClient(t, server.URL)
-	emittedIDs := make([]string, 0, 3)
+	emittedIDs := make([]string, 0, 4)
 
-	pagination, err := confluenceops.ListPageComments(
+	err := confluenceops.ListPageComments(
 		context.Background(),
 		client,
 		confluenceops.ListPageCommentsRequest{
 			PageID:     "123",
-			Limit:      3,
-			PageSize:   2,
 			BodyFormat: confluenceops.BodyFormatView,
 		},
 		func(item json.RawMessage) error {
@@ -190,18 +196,14 @@ func TestListPageCommentsTraversesThreadsAndHonorsLimit(t *testing.T) {
 		t.Fatalf("ListPageComments returned error: %v", err)
 	}
 
-	if !reflect.DeepEqual(emittedIDs, []string{"c1", "c1a", "c1b"}) {
+	if !reflect.DeepEqual(emittedIDs, []string{"c1", "c1a", "c1b", "c2"}) {
 		t.Fatalf("unexpected emitted ids: %#v", emittedIDs)
 	}
 
-	if requestCount != 3 {
-		t.Fatalf("expected 3 requests, got %d", requestCount)
-	}
-
-	if pagination != nil {
+	if requestCount != 6 {
 		t.Fatalf(
-			"expected nil pagination when limit reached but no more top-level comments, got %+v",
-			pagination,
+			"expected 6 requests (footer + c1 children + c1a children + c1b children + c2 children + c1 2nd page), got %d",
+			requestCount,
 		)
 	}
 }
@@ -307,7 +309,7 @@ func TestSearchPagesStripsBodyWhenNotRaw(t *testing.T) {
 	}
 }
 
-func TestListPageCommentsHonorsLimit(t *testing.T) {
+func TestListPageCommentsReturnsAll(t *testing.T) {
 	t.Parallel()
 
 	requestCount := 0
@@ -317,7 +319,16 @@ func TestListPageCommentsHonorsLimit(t *testing.T) {
 
 			switch request.URL.Path {
 			case "/wiki/api/v2/pages/123/footer-comments":
-				writeJSON(writer, `{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`)
+				writeJSON(
+					writer,
+					`{"results":[{"id":"c1"},{"id":"c2"}],"_links":{"next":""}}`,
+				)
+			case "/wiki/api/v2/footer-comments/c1/children":
+				// c1 has no children
+				writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
+			case "/wiki/api/v2/footer-comments/c2/children":
+				// c2 has no children
+				writeJSON(writer, `{"results":[],"_links":{"next":""}}`)
 			default:
 				t.Fatalf("unexpected path: %s", request.URL.Path)
 			}
@@ -328,13 +339,11 @@ func TestListPageCommentsHonorsLimit(t *testing.T) {
 	client := newTestClient(t, server.URL)
 	emitted := 0
 
-	pagination, err := confluenceops.ListPageComments(
+	err := confluenceops.ListPageComments(
 		context.Background(),
 		client,
 		confluenceops.ListPageCommentsRequest{
 			PageID:     "123",
-			Limit:      1,
-			PageSize:   1,
 			BodyFormat: confluenceops.BodyFormatNone,
 			Raw:        true,
 		},
@@ -347,15 +356,8 @@ func TestListPageCommentsHonorsLimit(t *testing.T) {
 		t.Fatalf("ListPageComments returned error: %v", err)
 	}
 
-	if emitted != 1 {
-		t.Fatalf("expected 1 emitted comment, got %d", emitted)
-	}
-
-	if pagination != nil {
-		t.Fatalf(
-			"expected nil pagination when limit reached but no more comments, got %+v",
-			pagination,
-		)
+	if emitted != 2 {
+		t.Fatalf("expected 2 emitted comments, got %d", emitted)
 	}
 }
 

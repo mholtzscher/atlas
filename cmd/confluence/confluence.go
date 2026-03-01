@@ -298,14 +298,11 @@ func newPageSearchCommand() *ufcli.Command {
 }
 
 func newPageCommentsCommand() *ufcli.Command {
-	flags := commentsFlags()
-	flags = append(flags, paginationFlags("Max comments to emit")...)
-
 	return &ufcli.Command{
 		Name:      "comments",
 		Usage:     "Get footer comments on a page",
 		ArgsUsage: "<PAGE_ID>",
-		Flags:     flags,
+		Flags:     commentsFlags(),
 		Action: func(ctx context.Context, cmd *ufcli.Command) error {
 			deps, err := runtime.New(cmd, true)
 			if err != nil {
@@ -316,14 +313,11 @@ func newPageCommentsCommand() *ufcli.Command {
 				return errors.New("expected exactly one argument: <PAGE_ID>")
 			}
 
-			pagination, listErr := confluenceops.ListPageComments(
+			return confluenceops.ListPageComments(
 				ctx,
 				deps.Client,
 				confluenceops.ListPageCommentsRequest{
 					PageID:     cmd.Args().First(),
-					Limit:      cmd.Int(flagLimit),
-					PageSize:   cmd.Int(flagPageSize),
-					Cursor:     cmd.String(flagCursor),
 					BodyFormat: confluenceops.BodyFormatStorage,
 					Raw:        cmd.Bool(flagRaw),
 				},
@@ -340,11 +334,6 @@ func newPageCommentsCommand() *ufcli.Command {
 					return deps.Emitter.EmitRecord(comment)
 				},
 			)
-			if listErr != nil {
-				return listErr
-			}
-
-			return deps.Emitter.EmitPagination(pagination)
 		},
 	}
 }
