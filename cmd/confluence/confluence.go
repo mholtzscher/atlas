@@ -19,7 +19,7 @@ const (
 	flagIncludeProperties = "include-properties"
 	flagIncludeOperations = "include-operations"
 	flagIncludeVersions   = "include-versions"
-	flagCQL               = "cql"
+	flagQuery             = "query"
 	flagLimit             = "limit"
 	flagPageSize          = "page-size"
 	flagCursor            = "cursor"
@@ -232,7 +232,11 @@ func newPageViewCommand() *ufcli.Command {
 
 func newPageSearchCommand() *ufcli.Command {
 	flags := pageSearchFlags()
-	flags = append(flags, &ufcli.StringFlag{Name: flagCQL, Usage: "CQL query", Required: true})
+	flags = append(flags, &ufcli.StringFlag{
+		Name:     flagQuery,
+		Usage:    "CQL query",
+		Required: true,
+	})
 	flags = append(flags, paginationFlags("Max pages to emit")...)
 
 	return &ufcli.Command{
@@ -246,7 +250,7 @@ func newPageSearchCommand() *ufcli.Command {
 			}
 
 			return confluenceops.SearchPages(ctx, deps.Client, confluenceops.SearchPagesRequest{
-				CQL:           cmd.String(flagCQL),
+				CQL:           cmd.String(flagQuery),
 				Limit:         cmd.Int(flagLimit),
 				PageSize:      cmd.Int(flagPageSize),
 				Cursor:        cmd.String(flagCursor),

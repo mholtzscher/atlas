@@ -10,7 +10,7 @@ Atlas provides programmatic access to Atlassian Cloud APIs with output formats o
 
 ### Jira Operations
 
-- **Issue search**: Query issues with JQL (`atlas jira issue search --jql 'project = ABC'`)
+- **Issue search**: Query issues with JQL (`atlas jira issue search --query 'project = ABC'`)
 - **Issue describe**: Retrieve specific issues by key with compact or raw output
 - **Issue comments**: Get comments with plain text body content
 - **Issue types**: List all available issue types
@@ -83,7 +83,7 @@ nix build
 atlas --help
 
 # Search Jira (JSONL by default)
-atlas jira issue search --jql 'project = ABC ORDER BY updated DESC'
+atlas jira issue search --query 'project = ABC ORDER BY updated DESC'
 
 # Describe specific issue with compact output
 atlas jira issue describe ABC-123
@@ -95,7 +95,7 @@ atlas jira issue describe ABC-123 --raw
 atlas confluence space list
 
 # Search Confluence pages
-atlas confluence page search --cql 'space = DEV'
+atlas confluence page search --query 'space = DEV'
 
 # View page content (formatted HTML output)
 atlas confluence page view 123456789

@@ -16,7 +16,7 @@ import (
 const (
 	flagFields    = "fields"
 	flagExpand    = "expand"
-	flagJQL       = "jql"
+	flagQuery     = "query"
 	flagLimit     = "limit"
 	flagPageSize  = "page-size"
 	flagPageToken = "page-token"
@@ -127,7 +127,7 @@ func newIssueSearchCommand() *ufcli.Command {
 		Name:  "search",
 		Usage: "Search issues with JQL",
 		Flags: []ufcli.Flag{
-			&ufcli.StringFlag{Name: flagJQL, Usage: "JQL query", Required: true},
+			&ufcli.StringFlag{Name: flagQuery, Usage: "JQL query", Required: true},
 			&ufcli.StringSliceFlag{Name: flagFields, Usage: "Additional issue fields (added to compact defaults)"},
 			&ufcli.StringSliceFlag{Name: flagExpand, Usage: "Expand fields"},
 			&ufcli.BoolFlag{Name: flagRaw, Usage: "Emit full Jira issue payload"},
@@ -142,7 +142,7 @@ func newIssueSearchCommand() *ufcli.Command {
 			}
 
 			return jiraops.SearchIssues(ctx, deps.Client, jiraops.SearchIssuesRequest{
-				JQL:       cmd.String(flagJQL),
+				JQL:       cmd.String(flagQuery),
 				Fields:    cmd.StringSlice(flagFields),
 				Expand:    cmd.StringSlice(flagExpand),
 				Raw:       cmd.Bool(flagRaw),
