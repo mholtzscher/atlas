@@ -20,9 +20,9 @@ Atlas provides programmatic access to Atlassian Cloud APIs with output formats o
 ### Confluence Operations
 
 - **Space list/describe**: List accessible spaces or describe specific space by key
-- **Page describe**: Get page metadata by ID
+- **Page describe**: Get page metadata by ID with optional include fields (labels, properties, operations, versions)
 - **Page view**: Display page body content (formatted HTML)
-- **Page search**: Search pages with CQL
+- **Page search**: Search pages with CQL with optional include fields
 - **Page comments**: Get footer comments with plain text body content
 
 ### Output Formats
@@ -96,6 +96,9 @@ atlas confluence space list
 
 # Search Confluence pages
 atlas confluence page search --query 'space = DEV'
+
+# Describe page with optional fields (labels, properties, operations, versions)
+atlas confluence page describe 12345678 --include labels,versions
 
 # View page content (formatted HTML output)
 atlas confluence page view 123456789

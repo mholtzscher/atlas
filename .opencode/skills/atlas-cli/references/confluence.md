@@ -31,15 +31,13 @@ Get page metadata by numeric page ID.
 
 ```bash
 atlas confluence page describe 12345678
-atlas confluence page describe 12345678 --include-labels --include-versions
+atlas confluence page describe 12345678 --include labels,versions
+atlas confluence page describe 12345678 --include all
 ```
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `--include-labels` | bool | Include page labels |
-| `--include-properties` | bool | Include page properties |
-| `--include-operations` | bool | Include permitted operations |
-| `--include-versions` | bool | Include version history |
+| `--include` | string slice | Fields to include: `labels`, `properties`, `operations`, `versions`, or `all` |
 
 ## page view
 
@@ -63,16 +61,13 @@ Search pages using CQL. `--query` is required.
 ```bash
 atlas confluence page search --query "space = DEV AND title ~ 'architecture'"
 atlas confluence page search --query "label = 'runbook'" --limit 10
-atlas confluence page search --query "type = page AND lastModified > now('-7d')" --include-labels
+atlas confluence page search --query "type = page AND lastModified > now('-7d')" --include labels
 ```
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--query` | string | - | CQL query (required) |
-| `--include-labels` | bool | `false` | Include page labels |
-| `--include-properties` | bool | `false` | Include page properties |
-| `--include-operations` | bool | `false` | Include permitted operations |
-| `--include-versions` | bool | `false` | Include version history |
+| `--include` | string slice | - | Fields to include: `labels`, `properties`, `operations`, `versions`, or `all` |
 | `--raw` | bool | `false` | Full payload |
 | `--limit` | int | `25` | Max total results |
 | `--page-size` | int | `25` | Results per API request |
