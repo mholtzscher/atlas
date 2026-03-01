@@ -37,7 +37,6 @@ We want compact, high-signal Jira defaults while allowing users to request extra
 
 ### Remove `--fields-by-keys`
 - Flag removed from commands.
-- Removed from ops registry metadata.
 - Implementation always sends `fieldsByKeys=true`.
 
 ## Design / Implementation
@@ -62,11 +61,6 @@ File: `cmd/jira/jira.go`
 - Update `--fields` help text to:
   - `Additional issue fields (added to compact defaults)`
 
-### Op registry changes
-File: `internal/ops/registry.go`
-
-- Remove `fields-by-keys` from Jira get/search `flags` lists.
-
 ### Docs/spec update
 File: `specs/agent-first-jsonl-jira-confluence-ro.md`
 
@@ -74,7 +68,7 @@ File: `specs/agent-first-jsonl-jira-confluence-ro.md`
 - Update `--fields` description to additive semantics.
 
 ## Deliverables (ordered)
-1. [D1] Remove `--fields-by-keys` from CLI + ops registry (S)
+1. [D1] Remove `--fields-by-keys` from CLI (S)
 2. [D2] Implement additive field merge in Jira ops (S)
 3. [D3] Update docs/spec text (S)
 4. [D4] Tests and `just check` (S)
@@ -94,7 +88,7 @@ File: `specs/agent-first-jsonl-jira-confluence-ro.md`
 ## Acceptance criteria
 - `atlas jira issue get KEY` requests defaults and sends `fieldsByKeys=true`.
 - `atlas jira issue get KEY --fields labels` requests defaults + `labels`, no duplicates.
-- CLI help and ops registry no longer expose `--fields-by-keys`.
+- CLI help no longer exposes `--fields-by-keys`.
 - `just check` passes.
 
 ## Open questions

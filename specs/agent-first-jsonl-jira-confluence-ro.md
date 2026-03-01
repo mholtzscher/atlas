@@ -13,7 +13,6 @@ Exception: CLI help output is always human text (even when `--output=jsonl`).
 
 Permissions model is harness-owned/enforced: the harness restricts which `atlas <op>` invocations are permitted. `atlas` supports this by:
 - keeping operations fine-grained (so harness can allowlist by command path)
-- shipping `atlas meta ops` (machine output) so the harness can discover op IDs + mutation classification
 - avoiding an escape hatch command that can hit arbitrary endpoints
 
 Authentication in v1 is PAT (email+API token) via flags/env only; OAuth is a follow-on.
@@ -25,8 +24,7 @@ Authentication in v1 is PAT (email+API token) via flags/env only; OAuth is a fol
 | [D2] Auth + HTTP client seam (PAT now, OAuth-ready interface) | M | D1 |
 | [D3] Jira read-only ops: issue get + JQL search (Cloud v3) with streaming + pagination | L | D2 |
 | [D4] Confluence read-only ops: page get + CQL search (Cloud v2) with streaming + pagination | L | D2 |
-| [D5] `atlas meta ops` (ops registry for harness allowlisting) | S | D1 |
-| [D6] Blackbox tests (testscript) for output shapes, pagination, and error records | M | D1-D5 |
+| [D5] Blackbox tests (testscript) for output shapes, pagination, and error records | M | D1-D4 |
 
 ### Non-Goals (Explicit Exclusions)
 - Write/mutate operations (create/update/transition) in Jira/Confluence
@@ -37,26 +35,13 @@ Authentication in v1 is PAT (email+API token) via flags/env only; OAuth is a fol
 
 ### Data Model
 
-#### Operation IDs (for harness policy)
-`atlas meta ops` emits these op IDs (JSONL, one per op):
-- `jira.issue.get` (read)
-- `jira.issue.search` (read)
-- `confluence.page.get` (read)
-- `confluence.page.search` (read)
-
-Each `meta ops` line:
-```json
-{"op":"jira.issue.get","mutates":false,"auth":["pat","oauth"],"args":{"positional":["issueKey"],"flags":["fields","expand"]}}
-```
-
 #### Output records (stdout, JSONL)
 All successful JSONL records are objects with:
-- `op` (string) operation ID
 - `data` (object) op-specific payload
 
 Example (jira issue get):
 ```json
-{"op":"jira.issue.get","data":{"key":"ABC-123","fields":{"summary":"...","status":{"name":"In Progress"}}}}
+{"data":{"key":"ABC-123","fields":{"summary":"...","status":{"name":"In Progress"}}}}
 ```
 
 For streaming list/search ops, stdout is a sequence of records (one per item). No summary record by default; EOF indicates completion.
@@ -70,7 +55,7 @@ For streaming list/search ops, stdout is a sequence of records (one per item). N
 On any failure, emit exactly one JSON object to stderr (in `--output=jsonl`) and exit non-zero.
 
 ```json
-{"error":{"code":"AUTH_FAILED","message":"...","op":"jira.issue.search","retryable":false,"details":{}}}
+{"error":{"code":"AUTH_FAILED","message":"...","retryable":false,"details":{}}}
 ```
 
 Error codes (initial set):
@@ -126,7 +111,7 @@ Base: `{site}/rest/api/3` (PAT mode).
   - `--page-size` (API `maxResults`; default 50)
   - `--page-token` (start token; default empty)
 
-Stdout: one JSONL record per issue with `op:"jira.issue.search"`.
+Stdout: one JSONL record per issue.
 
 #### Confluence ops (Cloud REST v2)
 Base: `{site}/wiki/api/v2` (PAT mode).
@@ -154,7 +139,7 @@ Output defaults to compact projection.
   - same include/body flags as `page get` (defaults token-efficient)
   - `--raw` (emit full Confluence payload; enables include/body options)
 
-Stdout: one JSONL record per page with `op:"confluence.page.search"`.
+Stdout: one JSONL record per page.
 
 #### OAuth (future)
 Define an auth abstraction that can later switch base URLs to Atlassian “ex” domains:
@@ -176,7 +161,6 @@ No OAuth commands in v1.
 - [ ] Confluence search follows cursor pagination via `_links.next`
 - [ ] Default payloads are token-efficient (minimal fields; no Confluence body by default)
 - [ ] No command exists that can call arbitrary endpoints (keeps harness allowlist meaningful)
-- [ ] `atlas meta ops` lists all ops with stable `op` IDs and `mutates=false`
 
 ### Test Strategy
 | Layer | What | How |
@@ -206,6 +190,6 @@ Mock upstream:
 - None (v1 bounded to Cloud + PAT; permissions enforced by harness)
 
 ### Success Metrics
-- Harness can allowlist by command path/op ID without needing deep parsing
+- Harness can allowlist by command path without needing deep parsing
 - Typical `search` output size reduced vs raw upstream by default field selection
 - Stable JSONL parsing across ops (no incidental stdout noise)

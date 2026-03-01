@@ -61,23 +61,6 @@ Notes:
 
 ## Operations / Contracts
 
-### Operation IDs
-
-Add stable op IDs:
-
-```go
-OpConfluenceSpaceList   = "confluence.space.list"
-OpConfluenceSpaceGet    = "confluence.space.get"
-OpConfluencePageComments = "confluence.page.comments"
-```
-
-### Allowlist Registry
-
-Update `internal/ops/registry.go`:
-- `confluence.space.list`: flags `limit`, `page-size`, `cursor`
-- `confluence.space.get`: positional `spaceKey`
-- `confluence.page.comments`: positional `pageID`; flags `limit`, `page-size`, `cursor`, `body-format`
-
 ---
 
 ## Implementation Details
@@ -89,9 +72,9 @@ Update `cmd/confluence/confluence.go`:
 - Add `page comments` command alongside `page get` and `page search`.
 
 Implementation pattern matches existing Confluence commands:
-- `runtime.New(cmd, opID, true)`
+- `runtime.New(cmd, true)`
 - Validate positional args (`expected exactly one argument: <...>`)
-- For list-like commands, stream items via `emit func(json.RawMessage) error` calling `deps.Emitter.EmitRecord(opID, item)`
+- For list-like commands, stream items via `emit func(json.RawMessage) error` calling `deps.Emitter.EmitRecord(item)`
 
 ### Confluence Operations
 
@@ -104,7 +87,7 @@ Update `internal/confluence/operations.go` with new operations using the existin
   - Decode response envelope minimally: `results []json.RawMessage`, `_links.next string`.
 - `GetSpaceByKey(ctx, client, spaceKey)`
   - Call list endpoint with `keys=<spaceKey>&limit=1`.
-  - If no results: return `atlaserr.New(atlaserr.CodeNotFound, "space not found", OpConfluenceSpaceGet, false, {"spaceKey":...})`.
+  - If no results: return `atlaserr.New(atlaserr.CodeNotFound, "space not found", false, nil)`.
   - Extract `id` from the returned JSON; then call `GET /wiki/api/v2/spaces/{id}` and emit that JSON.
 
 **Page footer comments (threads)**
@@ -129,7 +112,6 @@ Update `internal/confluence/operations.go` with new operations using the existin
   - returns `NOT_FOUND` when key does not exist (200 + empty results)
   - returns `INVALID_ARGUMENT` when `<SPACE_KEY>` is missing/empty
 - `atlas confluence page comments <PAGE_ID>` emits footer comments including replies; stops once `--limit` reached.
-- New ops appear in `atlas ops` output (if such command exists) / allowlist registry updated.
 - `just check` passes.
 
 ---
@@ -158,12 +140,11 @@ Update `internal/confluence/operations.go` with new operations using the existin
 
 | # | Deliverable | Effort | Location | Depends On |
 |---|-------------|--------|----------|------------|
-| 1 | Add op IDs + allowlist defs | S | `internal/ops/registry.go` | - |
-| 2 | Implement Confluence space ops | M | `internal/confluence/operations.go` | 1 |
-| 3 | Implement Confluence page comments op | M | `internal/confluence/operations.go` | 1 |
-| 4 | Add CLI commands (`space list/get`, `page comments`) | S | `cmd/confluence/confluence.go` | 2-3 |
-| 5 | Add tests | M | `internal/confluence/*_test.go`, `test/testscript/scripts/*` | 2-4 |
-| 6 | Run `just check` | S | - | 5 |
+| 1 | Implement Confluence space ops | M | `internal/confluence/operations.go` | - |
+| 2 | Implement Confluence page comments op | M | `internal/confluence/operations.go` | - |
+| 3 | Add CLI commands (`space list/get`, `page comments`) | S | `cmd/confluence/confluence.go` | 1-2 |
+| 4 | Add tests | M | `internal/confluence/*_test.go`, `test/testscript/scripts/*` | 1-3 |
+| 5 | Run `just check` | S | - | 4 |
 
 ---
 

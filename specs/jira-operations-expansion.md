@@ -59,22 +59,12 @@ All 4 operations are simple GET requests following existing patterns in `interna
 
 | # | Deliverable | Effort | Location | Depends On |
 |---|-------------|--------|----------|------------|
-| 1 | Add operation IDs to registry | S | `internal/ops/registry.go` | - |
-| 2 | Implement `jira project list` operation | M | `internal/jira/operations.go` | 1 |
-| 3 | Implement `jira issue comments` operation | M | `internal/jira/operations.go` | 1 |
-| 4 | Implement `jira issue types` operation | S | `internal/jira/operations.go` | 1 |
-| 5 | Implement `jira myself` operation | S | `internal/jira/operations.go` | 1 |
-| 6 | Add CLI commands | S | `cmd/jira/jira.go` | 2-5 |
-| 7 | Run `just check` | S | - | 6 |
-
-### Operation IDs
-
-```go
-OpJiraProjectList   = "jira.project.list"
-OpJiraIssueComments = "jira.issue.comments"
-OpJiraIssueTypes    = "jira.issue.types"
-OpJiraMyself        = "jira.myself"
-```
+| 1 | Implement `jira project list` operation | M | `internal/jira/operations.go` | - |
+| 2 | Implement `jira issue comments` operation | M | `internal/jira/operations.go` | - |
+| 3 | Implement `jira issue types` operation | S | `internal/jira/operations.go` | - |
+| 4 | Implement `jira myself` operation | S | `internal/jira/operations.go` | - |
+| 5 | Add CLI commands | S | `cmd/jira/jira.go` | 1-4 |
+| 6 | Run `just check` | S | - | 5 |
 
 ---
 

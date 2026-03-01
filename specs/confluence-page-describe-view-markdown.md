@@ -17,7 +17,6 @@
 - CLI routing and output emission are in `cmd/confluence/confluence.go`; current `page get` uses `confluenceops.GetPage` then `maybeCompactConfluenceRecord` then `Emitter.EmitRecord`.
 - Confluence request/query behavior is in `internal/confluence/operations.go` (`GetPage`, `buildQuery`, body-format constants).
 - Compact projection is in `internal/confluence/compact.go` and intentionally drops `body`.
-- Operation allowlisting and machine-visible op IDs are in `internal/ops/registry.go`.
 - Confluence Cloud REST v2 supports `body.view.value` for `GET /wiki/api/v2/pages/{id}` and this is suitable for HTML -> Markdown conversion.
 
 ## Decision
@@ -46,8 +45,7 @@
 | D1. Rename `page get` command to `page describe` and update help/usage | S | - |
 | D2. Add `page view` command that prints Markdown only | M | D1 |
 | D3. Implement Confluence page HTML extraction + HTML->MD conversion helper | M | D2 |
-| D4. Add operation IDs/registry entries for new command shape | S | D1, D2 |
-| D5. Add tests for extraction, conversion, and command surface changes | M | D1-D4 |
+| D4. Add tests for extraction, conversion, and command surface changes | M | D1-D3 |
 
 ## Non-Goals
 
@@ -75,17 +73,7 @@ In `cmd/confluence/confluence.go`:
   - Forces `BodyFormatView`.
   - Bypasses emitter for success output and writes markdown to `cmd.Writer`.
 
-### 2) Operation IDs and allowlist
-
-In `internal/ops/registry.go`:
-
-- Replace `OpConfluencePageGet` with `OpConfluencePageDescribe`.
-- Add `OpConfluencePageView`.
-- Update confluence definitions:
-  - `confluence.page.describe` with metadata flags.
-  - `confluence.page.view` with positional `pageID` and no content-format flag.
-
-### 3) Markdown conversion helper
+### 2) Markdown conversion helper
 
 Add `internal/confluence/markdown.go` (or equivalent):
 
@@ -98,13 +86,13 @@ Add `internal/confluence/markdown.go` (or equivalent):
 
 Suggested error behavior:
 
-- Missing `body.view.value` -> `atlaserr.New(CodeUpstreamError, "page body view missing", ops.OpConfluencePageView, false, nil)`.
-- Conversion failure -> wrapped as upstream error with op `confluence.page.view`.
+- Missing `body.view.value` -> `atlaserr.New(CodeUpstreamError, "page body view missing", false, nil)`.
+- Conversion failure -> wrapped as upstream error.
 
-### 4) Command execution flow for `page view`
+### 3) Command execution flow for `page view`
 
 1. Validate one page ID arg.
-2. Build runtime with op `confluence.page.view`.
+2. Build runtime with `runtime.New(cmd, true)`.
 3. Call `confluenceops.GetPage` with `SearchOptions{BodyFormat: BodyFormatView}`.
 4. Extract HTML from `body.view.value`.
 5. Convert to markdown.
@@ -152,8 +140,7 @@ Output for `page describe`:
 - [ ] `atlas confluence page describe <id>` returns compact metadata and excludes body content by default.
 - [ ] `atlas confluence page view <id>` returns markdown body only (no envelope, no metadata prelude).
 - [ ] `page view` uses Confluence `body.view.value` and converts common HTML blocks (headings, paragraphs, links, emphasis, lists, code blocks, tables).
-- [ ] Missing or invalid `body.view.value` returns structured atlas error tagged with `confluence.page.view`.
-- [ ] `internal/ops/registry.go` reflects new op IDs and args.
+- [ ] Missing or invalid `body.view.value` returns structured atlas error.
 - [ ] `just check` passes.
 
 ## Test Strategy
@@ -183,10 +170,9 @@ Output for `page describe`:
 ## Implementation Order
 
 1. D1 CLI rename and command tree updates.
-2. D4 op registry updates.
-3. D3 markdown helper + dependency.
-4. D2 wire `page view` flow.
-5. D5 tests and final `just check`.
+2. D2 markdown helper + dependency.
+3. D3 wire `page view` flow.
+4. D4 tests and final `just check`.
 
 ## Files Likely Touched
 
@@ -194,7 +180,6 @@ Output for `page describe`:
 - `internal/confluence/operations.go` (if helper extraction kept here) or new helper file in same package
 - `internal/confluence/markdown.go` (new)
 - `internal/confluence/markdown_test.go` (new)
-- `internal/ops/registry.go`
 - `go.mod`, `go.sum`
 - `test/testscript/scripts/basic.txtar` (if command help assertions added)
 

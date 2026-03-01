@@ -82,9 +82,6 @@ nix build
 # Show help
 atlas --help
 
-# List machine-readable operation IDs
-atlas meta ops
-
 # Search Jira (JSONL by default)
 atlas jira issue search --jql 'project = ABC ORDER BY updated DESC'
 
