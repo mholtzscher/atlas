@@ -150,31 +150,20 @@ func validateSearchRequest(request SearchIssuesRequest) error {
 		return atlaserr.InvalidArgument("missing required --jql")
 	}
 
-	if request.Limit < 0 {
-		return atlaserr.InvalidArgument("--limit must be >= 0")
-	}
-
-	if request.PageSize <= 0 {
-		return atlaserr.InvalidArgument("--page-size must be > 0")
-	}
-
 	return nil
 }
 
-func emitIssues(
-	issues []json.RawMessage,
-	remaining int,
-	emit func(item json.RawMessage) error,
-) (int, error) {
+func emitIssues(issues []json.RawMessage, remaining int, emit func(item json.RawMessage) error) (int, error) {
 	for _, issue := range issues {
+		if remaining <= 0 {
+			return 0, nil
+		}
+
 		if emitErr := emit(issue); emitErr != nil {
 			return remaining, fmt.Errorf("emit issue: %w", emitErr)
 		}
 
 		remaining--
-		if remaining == 0 {
-			return 0, nil
-		}
 	}
 
 	return remaining, nil
@@ -183,11 +172,14 @@ func emitIssues(
 func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
 	query := url.Values{}
 
-	query.Set("fieldsByKeys", "true")
+	effectiveFields := fields
+	if !raw && len(effectiveFields) == 0 {
+		effectiveFields = DefaultFields()
+	}
 
-	effectiveFields := mergeIssueFields(fields, raw)
-
-	query.Set("fields", strings.Join(effectiveFields, ","))
+	if len(effectiveFields) > 0 {
+		query.Set("fields", strings.Join(effectiveFields, ","))
+	}
 
 	if len(expand) > 0 {
 		query.Set("expand", strings.Join(expand, ","))
@@ -196,46 +188,12 @@ func buildIssueQuery(fields []string, expand []string, raw bool) url.Values {
 	return query
 }
 
-func mergeIssueFields(fields []string, raw bool) []string {
-	if raw {
-		return []string{"*all"}
-	}
-
-	defaults := DefaultFields()
-	effectiveFields := make([]string, 0, len(defaults)+len(fields))
-	seen := make(map[string]struct{}, len(defaults)+len(fields))
-
-	appendField := func(rawField string) {
-		field := strings.TrimSpace(rawField)
-		if field == "" {
-			return
-		}
-
-		if _, exists := seen[field]; exists {
-			return
-		}
-
-		seen[field] = struct{}{}
-		effectiveFields = append(effectiveFields, field)
-	}
-
-	for _, field := range defaults {
-		appendField(field)
-	}
-
-	for _, field := range fields {
-		appendField(field)
-	}
-
-	return effectiveFields
-}
-
 func decodeSearchResponse(body []byte) (issueSearchResponse, error) {
-	response := issueSearchResponse{}
+	var response issueSearchResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return issueSearchResponse{}, atlaserr.New(
 			atlaserr.CodeUpstreamError,
-			"invalid Jira search response JSON",
+			"invalid Jira issue search response JSON",
 			false,
 			nil,
 		)
@@ -245,50 +203,12 @@ func decodeSearchResponse(body []byte) (issueSearchResponse, error) {
 }
 
 const (
-	projectSearchPath = "/rest/api/3/project/search"
-	issueCommentsPath = "/rest/api/3/issue/"
 	issueTypesPath    = "/rest/api/3/issuetype"
+	issueCommentsPath = "/rest/api/3/issue/"
 	myselfPath        = "/rest/api/3/myself"
+	projectsPath      = "/rest/api/3/project"
+	projectSearchPath = "/rest/api/3/project/search"
 )
-
-// ListProjectsRequest defines Jira project list inputs.
-type ListProjectsRequest struct{}
-
-// ListProjects fetches all projects accessible to the user.
-func ListProjects(
-	ctx context.Context,
-	client *atlassian.Client,
-	_ ListProjectsRequest,
-	emit func(item json.RawMessage) error,
-) error {
-	query := url.Values{}
-	query.Set("maxResults", "1000")
-
-	body, err := client.Get(ctx, projectSearchPath, query)
-	if err != nil {
-		return err
-	}
-
-	var response struct {
-		Values []json.RawMessage `json:"values"`
-	}
-	if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
-		return atlaserr.New(
-			atlaserr.CodeUpstreamError,
-			"invalid Jira project list response JSON",
-			false,
-			nil,
-		)
-	}
-
-	for _, project := range response.Values {
-		if emitErr := emit(project); emitErr != nil {
-			return fmt.Errorf("emit project: %w", emitErr)
-		}
-	}
-
-	return nil
-}
 
 // GetIssueCommentsRequest defines Jira issue comments inputs.
 type GetIssueCommentsRequest struct {
@@ -328,7 +248,14 @@ func GetIssueComments(
 	}
 
 	for _, comment := range response.Comments {
-		if emitErr := emit(comment); emitErr != nil {
+		// Simplify comment body before emitting
+		simplifiedComment, simplifyErr := simplifyCommentBody(comment)
+		if simplifyErr != nil {
+			// If simplification fails, use original comment
+			simplifiedComment = comment
+		}
+
+		if emitErr := emit(simplifiedComment); emitErr != nil {
 			return fmt.Errorf("emit comment: %w", emitErr)
 		}
 	}
@@ -385,4 +312,205 @@ func GetMyself(
 	}
 
 	return json.RawMessage(body), nil
+}
+
+// simplifyCommentBody extracts the body content from ADF structure and returns plain text.
+// Input: {"body":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]},...}
+// Output: {"body":"Hello",...}.
+func simplifyCommentBody(comment json.RawMessage) (json.RawMessage, error) {
+	var data map[string]any
+	if err := json.Unmarshal(comment, &data); err != nil {
+		return nil, fmt.Errorf("parse comment: %w", err)
+	}
+
+	body, hasBody := data["body"]
+	if !hasBody {
+		return comment, nil
+	}
+
+	bodyObj, isMap := body.(map[string]any)
+	if !isMap {
+		return comment, nil
+	}
+
+	// Extract plain text from ADF structure.
+	plainText := extractTextFromADF(bodyObj)
+	if plainText != "" {
+		data["body"] = plainText
+		return json.Marshal(data)
+	}
+
+	return comment, nil
+}
+
+// extractTextFromADF extracts plain text from Atlassian Document Format structure.
+func extractTextFromADF(adf map[string]any) string {
+	// Check if it's an ADF document.
+	if docType, hasType := adf["type"]; !hasType || docType != "doc" {
+		return ""
+	}
+
+	content, hasContent := adf["content"]
+	if !hasContent {
+		return ""
+	}
+
+	contentArray, isArray := content.([]any)
+	if !isArray {
+		return ""
+	}
+
+	return extractTextFromContentNodes(contentArray)
+}
+
+// extractTextFromContentNodes extracts text from ADF content nodes.
+func extractTextFromContentNodes(nodes []any) string {
+	var texts []string
+
+	for _, node := range nodes {
+		nodeObj, isMap := node.(map[string]any)
+		if !isMap {
+			continue
+		}
+
+		texts = append(texts, extractTextFromNode(nodeObj)...)
+	}
+
+	return strings.Join(texts, " ")
+}
+
+// extractTextFromNode extracts text from a single ADF node.
+func extractTextFromNode(node map[string]any) []string {
+	var texts []string
+
+	nodeContent, hasNodeContent := node["content"]
+	if !hasNodeContent {
+		return texts
+	}
+
+	nodeContentArray, isNodeArray := nodeContent.([]any)
+	if !isNodeArray {
+		return texts
+	}
+
+	for _, child := range nodeContentArray {
+		childObj, isChildMap := child.(map[string]any)
+		if !isChildMap {
+			continue
+		}
+
+		if text := extractTextFromTextNode(childObj); text != "" {
+			texts = append(texts, text)
+		}
+	}
+
+	return texts
+}
+
+// extractTextFromTextNode extracts text from a text-type ADF node.
+func extractTextFromTextNode(node map[string]any) string {
+	if childType, hasChildType := node["type"]; !hasChildType || childType != "text" {
+		return ""
+	}
+
+	text, hasText := node["text"]
+	if !hasText {
+		return ""
+	}
+
+	textStr, isString := text.(string)
+	if !isString || textStr == "" {
+		return ""
+	}
+
+	return textStr
+}
+
+// ListProjectsRequest defines Jira projects list inputs.
+type ListProjectsRequest struct {
+	Query    string
+	Limit    int
+	PageSize int
+	Expand   []string
+}
+
+// ListProjects fetches all projects the user has access to.
+func ListProjects(
+	ctx context.Context,
+	client *atlassian.Client,
+	request ListProjectsRequest,
+	emit func(item json.RawMessage) error,
+) error {
+	if request.Limit <= 0 {
+		return nil
+	}
+
+	remaining := request.Limit
+
+	for remaining > 0 {
+		pageSize := min(remaining, request.PageSize)
+
+		query := url.Values{}
+		if request.Query != "" {
+			query.Set("query", request.Query)
+		}
+		query.Set("maxResults", strconv.Itoa(pageSize))
+
+		if len(request.Expand) > 0 {
+			query.Set("expand", strings.Join(request.Expand, ","))
+		}
+
+		path := projectsPath
+		if request.Query != "" {
+			path = projectSearchPath
+		}
+
+		body, err := client.Get(ctx, path, query)
+		if err != nil {
+			return err
+		}
+
+		var projects []json.RawMessage
+		if request.Query != "" {
+			var response struct {
+				Values []json.RawMessage `json:"values"`
+			}
+			if unmarshalErr := json.Unmarshal(body, &response); unmarshalErr != nil {
+				return atlaserr.New(
+					atlaserr.CodeUpstreamError,
+					"invalid Jira project search response JSON",
+					false,
+					nil,
+				)
+			}
+			projects = response.Values
+		} else {
+			if unmarshalErr := json.Unmarshal(body, &projects); unmarshalErr != nil {
+				return atlaserr.New(
+					atlaserr.CodeUpstreamError,
+					"invalid Jira projects response JSON",
+					false,
+					nil,
+				)
+			}
+		}
+
+		for _, project := range projects {
+			if remaining <= 0 {
+				return nil
+			}
+
+			if emitErr := emit(project); emitErr != nil {
+				return fmt.Errorf("emit project: %w", emitErr)
+			}
+
+			remaining--
+		}
+
+		if len(projects) < pageSize {
+			return nil
+		}
+	}
+
+	return nil
 }

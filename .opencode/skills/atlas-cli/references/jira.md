@@ -67,13 +67,13 @@ ORDER BY updated DESC                       # sort by recently updated
 
 ## issue comments
 
-Get comments on an issue.
+Get comments on an issue. Comments include the body content as plain text (ADF converted to readable text).
 
 ```bash
 atlas jira issue comments PROJ-123
 ```
 
-No additional flags. Returns all comments.
+No additional flags. Returns all comments with plain text bodies.
 
 ## issue types
 

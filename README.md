@@ -12,7 +12,7 @@ Atlas provides programmatic access to Atlassian Cloud APIs with output formats o
 
 - **Issue search**: Query issues with JQL (`atlas jira issue search --jql 'project = ABC'`)
 - **Issue describe**: Retrieve specific issues by key with compact or raw output
-- **Issue comments**: Get comments on an issue
+- **Issue comments**: Get comments with plain text body content
 - **Issue types**: List all available issue types
 - **Project list**: List all accessible projects
 - **Myself**: Get current user information
