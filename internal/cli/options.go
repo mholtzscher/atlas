@@ -24,8 +24,6 @@ const (
 	FlagTimeout = "timeout"
 	// FlagVerbose enables diagnostic logs.
 	FlagVerbose = "verbose"
-	// FlagNoColor disables color output.
-	FlagNoColor = "no-color"
 )
 
 const (
@@ -54,7 +52,6 @@ type GlobalOptions struct {
 	APIToken string
 	Timeout  time.Duration
 	Verbose  bool
-	NoColor  bool
 }
 
 // GlobalOptionsFromCommand extracts global options from command.
@@ -69,6 +66,5 @@ func GlobalOptionsFromCommand(cmd *ufcli.Command) GlobalOptions {
 		APIToken: cmd.String(FlagAPIToken),
 		Timeout:  cmd.Duration(FlagTimeout),
 		Verbose:  cmd.Bool(FlagVerbose),
-		NoColor:  cmd.Bool(FlagNoColor),
 	}
 }

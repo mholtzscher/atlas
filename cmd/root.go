@@ -125,10 +125,5 @@ func globalFlags() []ufcli.Flag {
 			Usage:   "Print verbose output",
 			Sources: configSources(cli.FlagVerbose),
 		},
-		&ufcli.BoolFlag{
-			Name:    cli.FlagNoColor,
-			Usage:   "Disable colored output",
-			Sources: configSources(cli.FlagNoColor),
-		},
 	}
 }
