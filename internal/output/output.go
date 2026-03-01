@@ -23,6 +23,19 @@ type successRecord struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// Pagination contains metadata about paginated results.
+type Pagination struct {
+	HasMore    bool   `json:"hasMore"`
+	NextCursor string `json:"nextCursor,omitempty"`
+	Total      int    `json:"total,omitempty"`
+	Returned   int    `json:"returned"`
+}
+
+// paginationRecord wraps pagination metadata for JSONL output.
+type paginationRecord struct {
+	Pagination *Pagination `json:"pagination"`
+}
+
 // Emitter writes success and error output.
 type Emitter struct {
 	format Format
@@ -87,6 +100,30 @@ func (e Emitter) EmitError(err *atlaserr.Error) error {
 
 	_, writeErr := fmt.Fprintln(e.stderr, string(errorBytes))
 	return writeErr
+}
+
+// EmitPagination writes pagination metadata if applicable.
+// When hasMore is false, the record is omitted entirely for JSONL format.
+func (e Emitter) EmitPagination(pagination *Pagination) error {
+	if pagination == nil || !pagination.HasMore {
+		return nil
+	}
+
+	switch e.format {
+	case FormatText:
+		// Text format doesn't include pagination metadata
+		return nil
+
+	case FormatJSONL:
+		recordBytes, err := json.Marshal(paginationRecord{Pagination: pagination})
+		if err != nil {
+			return fmt.Errorf("marshal pagination record: %w", err)
+		}
+		_, err = fmt.Fprintln(e.stdout, string(recordBytes))
+		return err
+	}
+
+	return fmt.Errorf("unknown format: %s", e.format)
 }
 
 // Format returns emitter output format.

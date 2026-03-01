@@ -110,7 +110,7 @@ func TestSearchIssuesRawRequestsAllFields(t *testing.T) {
 
 	client := newTestClient(t, server.URL)
 
-	err := jiraops.SearchIssues(context.Background(), client, jiraops.SearchIssuesRequest{
+	pagination, err := jiraops.SearchIssues(context.Background(), client, jiraops.SearchIssuesRequest{
 		JQL:      "project = ATLAS",
 		Raw:      true,
 		Limit:    1,
@@ -125,6 +125,10 @@ func TestSearchIssuesRawRequestsAllFields(t *testing.T) {
 
 	if emitted != 1 {
 		t.Fatalf("expected 1 emitted issue, got %d", emitted)
+	}
+
+	if pagination != nil {
+		t.Fatalf("expected nil pagination when no more results, got %+v", pagination)
 	}
 }
 
@@ -153,7 +157,7 @@ func TestSearchIssuesSetsFieldsByKeysTrue(t *testing.T) {
 
 	client := newTestClient(t, server.URL)
 
-	err := jiraops.SearchIssues(context.Background(), client, jiraops.SearchIssuesRequest{
+	pagination, err := jiraops.SearchIssues(context.Background(), client, jiraops.SearchIssuesRequest{
 		JQL:      "project = ATLAS",
 		Fields:   []string{"labels"},
 		Limit:    1,
@@ -168,6 +172,10 @@ func TestSearchIssuesSetsFieldsByKeysTrue(t *testing.T) {
 
 	if emitted != 1 {
 		t.Fatalf("expected 1 emitted issue, got %d", emitted)
+	}
+
+	if pagination != nil {
+		t.Fatalf("expected nil pagination when no more results, got %+v", pagination)
 	}
 }
 
