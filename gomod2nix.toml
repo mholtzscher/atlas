@@ -730,8 +730,8 @@ schema = 3
     hash = 'sha256-Us+saDd/xo9LraXOX5TNKvMc1xBt65ByrZmFxgM3JXo='
 
   [mod.'github.com/urfave/cli/v3']
-    version = 'v3.6.2'
-    hash = 'sha256-GeTwfmXv2okvX2kmMREozvH4PH6ihPNVFSNSWrW+gyQ='
+    version = 'v3.7.0'
+    hash = 'sha256-orXzqMVkRBlGGjmPoYr2uqDdeNf0hq5yOHOL99RBtuk='
 
   [mod.'github.com/uudashr/gocognit']
     version = 'v1.2.0'
