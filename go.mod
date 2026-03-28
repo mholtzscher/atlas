@@ -7,7 +7,7 @@ require (
 	github.com/go-xmlfmt/xmlfmt v1.1.3
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/urfave/cli-altsrc/v3 v3.1.0
-	github.com/urfave/cli/v3 v3.7.0
+	github.com/urfave/cli/v3 v3.8.0
 )
 
 require (
