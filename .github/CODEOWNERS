@@ -1,0 +1,5 @@
+# Default owner for all files
+* @username
+
+# GitHub-specific config
+.github/ @username
